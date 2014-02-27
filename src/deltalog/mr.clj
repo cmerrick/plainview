@@ -11,15 +11,18 @@
 
 (defn make-fields [& fields] (Fields. (into-array fields)))
 
-(def source-scheme (TextLine. (make-fields "line")))
-(def in-tap (Hfs. source-scheme "example/input.json"))
-(def out-tap (Hfs. (TextLine.) "example/output" true))
+; This creates a tap that will read a text file line-by-line.
+; The resultant field will be named "line".
+(def in-tap (Hfs. (TextLine. (make-fields "line")) "example/input.json"))
 
+; This creates a JSON parser that will extract the "name" and "email"
+; from a JSON object. The resultant fields will be named "name" and "email".
 (def splitter (JSONSplitter. (make-fields "name" "email") (into-array ["name" "email"])))
 
-(defn -main []
-  (let [pipe1 (Pipe. "json_flatten")
-        pipe2 (Each. pipe1 (make-fields "line") splitter (make-fields "name" "email"))
-        flow-connector (HadoopFlowConnector.)]
+(def out-tap (Hfs. (TextLine.) "example/output" true))
 
-  (.complete (.connect flow-connector in-tap out-tap pipe2))))
+(defn -main []
+  (let [parent-pipe (Pipe. "json_split")
+        splitter-pipe (Each. parent-pipe splitter)]
+
+    (.complete (.connect (HadoopFlowConnector.) in-tap out-tap splitter-pipe))))
