@@ -5,33 +5,38 @@
             TableMapEvent QueryEvent DeleteRowsEvent])
   (:gen-class))
 
+(def root-dir "/Users/chris/raw/")
 
-(defn write-event [table timestamp value]
-  (let [out (str "t=" timestamp " " value "\n")]
-;    (spit (str "/Users/chris/raw/" table) out :append true)
-    (print out)))
+(defn write-rows-event [event]
+  (let [table-id (.getTableId event)
+        out (str "t=" (.. event getHeader getTimestamp) " " event "\n")]
+    (spit (str root-dir table-id) out :append true)))
+
+(defn write-schema-event []
+  (let [out (str "t=" (.. event getHeader getTimestamp) " " event "\n")]
+    (spit (str root-dir "schema") out :append true)))
 
 (defmulti handle-event class)
 
 (defmethod handle-event WriteRowsEvent
   [e]
-  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
+  (write-rows-event e))
 
 (defmethod handle-event UpdateRowsEvent
   [e]
-  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
+  (write-rows-event e))
 
 (defmethod handle-event DeleteRowsEvent
   [e]
-  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
+  (write-rows-event e))
 
 (defmethod handle-event TableMapEvent
   [e]
-  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
+  (write-schema-event (.getTableId e) (.. e getHeader getTimestamp) e))
 
 (defmethod handle-event QueryEvent
   [e]
-  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
+  (write-schema-event (.getTableId e) (.. e getHeader getTimestamp) e))
 
 (defmethod handle-event :default
   [e]
@@ -57,4 +62,4 @@
     (.setBinlogEventListener listener)))
 
 (defn -main []
-  (.start (replicator "mysql-bin.000001" 5601 (MyListener.))))
+  (.start (replicator "mysql-bin.000001" 4 (MyListener.))))
