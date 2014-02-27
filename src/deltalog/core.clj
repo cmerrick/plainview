@@ -5,19 +5,18 @@
   (:gen-class))
 
 
-(defn write-rows [table rows]
-  (println (map #(.getColumns %) rows))
-  (spit (str "/Users/chris/raw/" table) (clojure.string/join "\n" (clojure.string/join ", " (map #(.getColumns %) rows))) :append true))
+(defn write-rows [table timestamp rows]
+  (spit (str "/Users/chris/raw/" table) (str "t=" timestamp " "(clojure.string/join ", " (map #(.getColumns %) rows)) "\n") :append true))
 
 (defmulti handle-event class)
 
 (defmethod handle-event WriteRowsEvent
   [e]
-  (write-rows (.getTableId e) (.getRows e)))
+  (write-rows (.getTableId e) (.. e getHeader getTimestamp) (.getRows e)))
 
 (defmethod handle-event UpdateRowsEvent
   [e]
-  (write-rows (.getTableId e) (.getBefore (.getRows e))))
+  (write-rows (.getTableId e) (.. e getHeader getTimestamp) (.. e getRows getAfter)))
 
 (defmethod handle-event :default
   [e]
