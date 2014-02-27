@@ -4,6 +4,7 @@
   []
   {:id 1
    :timestamp (long 123456789)
+   :is-delete 0
    :data [1, "actual-name", "actual-email", 1]})
 
 (def user [:id, :name, :email, :state])
