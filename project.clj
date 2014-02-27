@@ -9,4 +9,5 @@
                  [org.apache.hadoop/hadoop-core "1.1.2"]
                  [cascading/cascading-hadoop "2.2.0"]
                  [cascading/cascading-local "2.2.0"]
-                 [cascading.gmarabout/cascading-json "0.0.3"]])
+                 [cascading.gmarabout/cascading-json "0.0.3"]
+                 [cheshire "5.3.1"]])

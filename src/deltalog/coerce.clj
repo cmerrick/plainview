@@ -1,0 +1,17 @@
+(ns deltalog.coerce
+  (:import [com.google.code.or.common.glossary.column
+            Int24Column DecimalColumn DoubleColumn
+            EnumColumn FloatColumn LongColumn]))
+
+(defmulti coerce class)
+
+(defmethod coerce Int24Column [c] (.getValue c))
+(defmethod coerce DecimalColumn [c] (.getValue c))
+(defmethod coerce DoubleColumn [c] (.getValue c))
+(defmethod coerce EnumColumn [c] (.getValue c))
+(defmethod coerce FloatColumn [c] (.getValue c))
+(defmethod coerce LongColumn [c] (.getValue c))
+
+(defmethod coerce :default
+  [c]
+  (.toString c))

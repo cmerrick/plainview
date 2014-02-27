@@ -1,4 +1,6 @@
 (ns deltalog.core
+  (:require [cheshire.core :refer :all]
+            [deltalog.coerce :refer [coerce]])
   (:import [com.google.code.or OpenReplicator]
            [com.google.code.or.binlog BinlogEventListener]
            [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
@@ -7,40 +9,49 @@
 
 (def root-dir "/Users/chris/raw/")
 
-(defn write-rows-event [event]
-  (let [table-id (.getTableId event)
-        out (str "t=" (.. event getHeader getTimestamp) " " event "\n")]
-    (spit (str root-dir table-id) out :append true)))
-
-(defn write-schema-event []
-  (let [out (str "t=" (.. event getHeader getTimestamp) " " event "\n")]
-    (spit (str root-dir "schema") out :append true)))
+(defn write-data [table-id ts pk delete? data]
+  (let [ out {:timestamp ts
+              :id (coerce pk)
+              :is-delete delete?
+              :data (map coerce data)}]
+    (spit (str root-dir table-id) (str (generate-string out) "\n") :append true)))
 
 (defmulti handle-event class)
 
 (defmethod handle-event WriteRowsEvent
   [e]
-  (write-rows-event e))
+  (doseq [row (.getRows e)]
+    (let [columns (.. row getColumns)]
+      (write-data (.getTableId e)
+                  (.. e getHeader getTimestamp)
+                  (.get columns 0)          ; assume pk is first
+                  0
+                  columns))))
 
 (defmethod handle-event UpdateRowsEvent
   [e]
-  (write-rows-event e))
+  (doseq [pair (.getRows e)]
+    (let [columns (.. pair getAfter getColumns)]
+      (write-data (.getTableId e)
+                  (.. e getHeader getTimestamp)
+                  (.get columns 0)          ; assume pk is first
+                  0
+                  columns))))
 
 (defmethod handle-event DeleteRowsEvent
   [e]
-  (write-rows-event e))
-
-(defmethod handle-event TableMapEvent
-  [e]
-  (write-schema-event (.getTableId e) (.. e getHeader getTimestamp) e))
-
-(defmethod handle-event QueryEvent
-  [e]
-  (write-schema-event (.getTableId e) (.. e getHeader getTimestamp) e))
+  (doseq [row (.getRows e)]
+    (let [columns (.. row getColumns)]
+      (write-data (.getTableId e)
+                  (.. e getHeader getTimestamp)
+                  (.get columns 0)          ; assume pk is first
+                  1
+                  columns))))
 
 (defmethod handle-event :default
   [e]
-  (println (str e "\n")))
+;  (println (str e "\n"))
+  )
 
 (deftype MyListener []
   BinlogEventListener
