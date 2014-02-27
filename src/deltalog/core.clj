@@ -1,26 +1,41 @@
 (ns deltalog.core
   (:import [com.google.code.or OpenReplicator]
            [com.google.code.or.binlog BinlogEventListener]
-           [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent])
+           [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
+            TableMapEvent QueryEvent DeleteRowsEvent])
   (:gen-class))
 
 
-(defn write-rows [table timestamp rows]
-  (spit (str "/Users/chris/raw/" table) (str "t=" timestamp " "(clojure.string/join ", " (map #(.getColumns %) rows)) "\n") :append true))
+(defn write-event [table timestamp value]
+  (let [out (str "t=" timestamp " " value "\n")]
+;    (spit (str "/Users/chris/raw/" table) out :append true)
+    (print out)))
 
 (defmulti handle-event class)
 
 (defmethod handle-event WriteRowsEvent
   [e]
-  (write-rows (.getTableId e) (.. e getHeader getTimestamp) (.getRows e)))
+  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
 
 (defmethod handle-event UpdateRowsEvent
   [e]
-  (write-rows (.getTableId e) (.. e getHeader getTimestamp) (.. e getRows getAfter)))
+  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
+
+(defmethod handle-event DeleteRowsEvent
+  [e]
+  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
+
+(defmethod handle-event TableMapEvent
+  [e]
+  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
+
+(defmethod handle-event QueryEvent
+  [e]
+  (write-event (.getTableId e) (.. e getHeader getTimestamp) e))
 
 (defmethod handle-event :default
   [e]
-  (println "skip"))
+  (println (str e "\n")))
 
 (deftype MyListener []
   BinlogEventListener
@@ -42,4 +57,4 @@
     (.setBinlogEventListener listener)))
 
 (defn -main []
-  (.start (replicator "mysql-bin.000002" 2129629 (MyListener.))))
+  (.start (replicator "mysql-bin.000003" 226096 (MyListener.))))
