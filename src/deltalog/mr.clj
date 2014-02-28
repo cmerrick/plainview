@@ -25,8 +25,8 @@
 
 ; This creates a tap that will read a text file line-by-line.
 ; The resultant field will be named "line".
-(def in-tap (Lfs. (AvroScheme.) "/Users/chris/raw"))
-(def out-tap (Lfs. (AvroScheme. schema/user-schema) "example/output"))
+(def in-tap (Hfs. (AvroScheme.) "example/raw/raw-372.avro"))
+(def out-tap (Hfs. (AvroScheme. schema/user-schema) "example/output" true))
 
 (defn filter-ts-if
   "If timestamp evaluates to true, then this will create a new

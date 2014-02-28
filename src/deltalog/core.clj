@@ -8,10 +8,10 @@
             TableMapEvent QueryEvent DeleteRowsEvent])
   (:gen-class))
 
-(def root-dir "/Users/chris/raw/")
+(def root-dir "example/raw")
 
 (defn write-data [table-id ts pk delete? data]
-  (let [filename (str root-dir table-id)
+  (let [filename (str root-dir "/raw-" table-id ".avro")
         schema (schema/tableid->schema table-id)
         datum (vec (concat [ts delete?] (map coerce data)))]
     (with-open [adf (if (.exists (clojure.java.io/as-file filename))
@@ -75,4 +75,4 @@
     (.setBinlogEventListener listener)))
 
 (defn -main []
-  (.start (replicator "mysql-bin.000001" 1168 (MyListener.))))
+  (.start (replicator "mysql-bin.000003" 8476 (MyListener.))))
