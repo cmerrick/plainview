@@ -29,19 +29,17 @@
 (defn -main []
   (let [json-paths ["id" "timestamp" "is-delete" "data"]
 
-        splitter (make-splitter json-paths)
-        splitter-pipe (Each. "json_split" splitter)
-        filter-pipe (Each. splitter-pipe
-                           (make-fields ["timestamp"])
-                           (ExpressionFilter. "timestamp >= 1393542318" Long/TYPE))
-        group-pipe (GroupBy. filter-pipe
-                             (make-fields ["id"])
-                             (make-fields ["timestamp"]))
-        max-pipe (Every. group-pipe Fields/ALL (Last.) Fields/RESULTS)
+        splitter-pipe (Each. "json_split" (make-splitter json-paths))
+        tail-pipe (-> splitter-pipe
+                      (Each. (make-fields ["timestamp"])
+                             (ExpressionFilter. "timestamp >= 1393542318" Long/TYPE))
+                      (GroupBy. (make-fields ["id"])
+                                (make-fields ["timestamp"]))
+                      (Every. Fields/ALL (Last.) Fields/RESULTS))
 
         flow-def (-> (FlowDef/flowDef)
                      (.addSource splitter-pipe in-tap)
-                     (.addTailSink max-pipe out-tap))]
+                     (.addTailSink tail-pipe out-tap))]
 
     (-> (HadoopFlowConnector.)
         (.connect flow-def)
