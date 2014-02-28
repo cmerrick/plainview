@@ -28,13 +28,24 @@
 
 (def out-tap (Hfs. (AvroScheme. (schema/avro-schema)) "example/output" true))
 
-(defn -main []
+(defn filter-ts-if
+  "If timestamp evaluates to true, then this will create a new
+  pipe that filters where the 'timestamp' field is greater than or equal
+  to the given timestamp value. Otherwise it returns pipe."
+  [pipe timestamp]
+  (if timestamp
+    (Each. pipe
+           (make-fields ["timestamp"])
+           (ExpressionFilter. (str "timestamp >= " timestamp) Long/TYPE))
+    pipe))
+
+(defn -main
+  [& args]
   (let [json-paths ["id" "timestamp" "is_delete" "data"]
 
         splitter-pipe (Each. "json_split" (make-splitter json-paths))
         tail-pipe (-> splitter-pipe
-                      ;(Each. (make-fields ["timestamp"])
-                      ;       (ExpressionFilter. "timestamp >= 1393542318" Long/TYPE))
+                      (filter-ts-if (first args))
                       (GroupBy. (make-fields ["id"])
                                 (make-fields ["timestamp"]))
                       (Every. Fields/ALL (Last.) Fields/RESULTS))
