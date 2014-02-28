@@ -1,6 +1,7 @@
 (ns deltalog.core
-  (:require [cheshire.core :refer :all]
-            [deltalog.coerce :refer [coerce]])
+  (:require [deltalog.coerce :refer [coerce]]
+            [deltalog.schema :as schema]
+            [abracad.avro :as avro])
   (:import [com.google.code.or OpenReplicator]
            [com.google.code.or.binlog BinlogEventListener]
            [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
@@ -10,11 +11,13 @@
 (def root-dir "/Users/chris/raw/")
 
 (defn write-data [table-id ts pk delete? data]
-  (let [ out {:timestamp ts
-              :id (coerce pk)
-              :is_delete delete?
-              :data (map coerce data)}]
-    (spit (str root-dir table-id) (str (generate-string out) "\n") :append true)))
+  (let [filename (str root-dir table-id)
+        schema (schema/tableid->schema table-id)
+        datum (vec (concat [ts delete?] (map coerce data)))]
+    (with-open [adf (if (.exists (clojure.java.io/as-file filename))
+                      (avro/data-file-writer filename)
+                      (avro/data-file-writer schema filename))]
+      (.append adf datum))))
 
 (defmulti handle-event class)
 
@@ -25,7 +28,7 @@
       (write-data (.getTableId e)
                   (.. e getHeader getTimestamp)
                   (.get columns 0)          ; assume pk is first
-                  0
+                  false
                   columns))))
 
 (defmethod handle-event UpdateRowsEvent
@@ -35,7 +38,7 @@
       (write-data (.getTableId e)
                   (.. e getHeader getTimestamp)
                   (.get columns 0)          ; assume pk is first
-                  0
+                  false
                   columns))))
 
 (defmethod handle-event DeleteRowsEvent
@@ -45,13 +48,12 @@
       (write-data (.getTableId e)
                   (.. e getHeader getTimestamp)
                   (.get columns 0)          ; assume pk is first
-                  1
+                  true
                   columns))))
 
 (defmethod handle-event :default
   [e]
-;  (println (str e "\n"))
-  )
+  (println (str e "\n")))
 
 (deftype MyListener []
   BinlogEventListener
@@ -73,4 +75,4 @@
     (.setBinlogEventListener listener)))
 
 (defn -main []
-  (.start (replicator "mysql-bin.000001" 4 (MyListener.))))
+  (.start (replicator "mysql-bin.000001" 1168 (MyListener.))))

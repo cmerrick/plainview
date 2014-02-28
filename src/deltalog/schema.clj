@@ -1,12 +1,6 @@
 (ns deltalog.schema
+  (:require [abracad.avro :as avro])
   (:import [org.apache.avro Schema$Parser]))
-
-(defn- generic-schema  ; documentation for reference only
-  []
-  {:id 1
-   :timestamp (long 123456789)
-   :is_delete 0
-   :data [1, "actual-name", "actual-email", 1]})
 
 (def user [:id, :name, :email, :state])
 (def cart [:id, :created_at, :user_id, :state, :item_count])
@@ -15,14 +9,19 @@
 (defn get-index [schema field]
   (.indexOf schema field))
 
-(defn avro-schema []
-  (let [parser (Schema$Parser.)]
-    (.parse parser
-            "{
-     \"type\": \"record\",
-         \"name\": \"test\",
-             \"fields\" : [
-                               {\"name\": \"id\", \"type\": \"int\"},
-                                   {\"name\": \"timestamp\", \"type\": \"int\"},
-                                   {\"name\": \"is_delete\", \"type\": \"int\"},
-                                   {\"name\": \"data\", \"type\": \"string\"}]}"          )))
+(def user-schema
+  (avro/parse-schema
+   {:type :record
+    :name "user"
+    :fields [{:name "timestamp" :type :long}
+             {:name "delete" :type :boolean}
+             {:name "id" :type :int}
+             {:name "name" :type :string}
+             {:name "email" :type :string}
+             {:name "state" :type :int}]}))
+
+(defn tableid->schema [table-id]
+  (case table-id
+    323 user-schema
+
+    user-schema))

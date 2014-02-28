@@ -15,4 +15,4 @@
                                [org.apache.hadoop/hadoop-core]
                                cascading/cascading-core]]
                  [org.apache.avro/avro "1.7.4" :exclusions [org.slf4j/slf4j-api]]
-                 [cheshire "5.3.1"]])
+                 [com.damballa/abracad "0.4.9"]])

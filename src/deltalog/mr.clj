@@ -2,7 +2,8 @@
   (:require [deltalog.schema :as schema])
   (:import [org.apache.hadoop.fs Path FileSystem]
            [org.apache.hadoop.conf Configuration]
-           [cascading.tap.hadoop Hfs]
+           [cascading.tap SinkMode]
+           [cascading.tap.hadoop Hfs Lfs]
            [cascading.avro AvroScheme]
            [cascading.scheme.hadoop TextDelimited TextLine]
            [cascading.tuple Fields]
@@ -24,9 +25,8 @@
 
 ; This creates a tap that will read a text file line-by-line.
 ; The resultant field will be named "line".
-(def in-tap (Hfs. (TextLine. (make-fields ["line"])) "example/input.json"))
-
-(def out-tap (Hfs. (AvroScheme. (schema/avro-schema)) "example/output" true))
+(def in-tap (Hfs. (AvroScheme.) "/Users/chris/raw/323"))
+(def out-tap (Lfs. (AvroScheme. schema/user-schema) "example/output"))
 
 (defn filter-ts-if
   "If timestamp evaluates to true, then this will create a new
@@ -41,19 +41,18 @@
 
 (defn -main
   [& args]
-  (let [json-paths ["id" "timestamp" "is_delete" "data"]
-
-        splitter-pipe (Each. "json_split" (make-splitter json-paths))
-        tail-pipe (-> splitter-pipe
-                      (filter-ts-if (first args))
-                      (GroupBy. (make-fields ["id"])
-                                (make-fields ["timestamp"]))
-                      (Every. Fields/ALL (Last.) Fields/RESULTS))
+  (let [copy-pipe (Pipe. "copy")
+        #_(tail-pipe (-> splitter-pipe
+                          (filter-ts-if (first args))
+                          (GroupBy. (make-fields ["id"])
+                                    (make-fields ["timestamp"]))
+                          (Every. Fields/ALL (Last.) Fields/RESULTS)))
 
         flow-def (-> (FlowDef/flowDef)
-                     (.addSource splitter-pipe in-tap)
-                     (.addTailSink tail-pipe out-tap))]
+                     (.addSource copy-pipe in-tap)
+                     (.addTailSink copy-pipe out-tap))]
 
-    (-> (HadoopFlowConnector.)
-        (.connect flow-def)
-        (.complete))))
+    (let [flow (.connect (HadoopFlowConnector.) flow-def)]
+      (doto flow
+        (.writeDOT "example/flow.dot")
+        (.complete)))))
