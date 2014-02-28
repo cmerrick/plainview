@@ -25,7 +25,7 @@
 
 ; This creates a tap that will read a text file line-by-line.
 ; The resultant field will be named "line".
-(def in-tap (Hfs. (AvroScheme.) "/Users/chris/raw/323"))
+(def in-tap (Lfs. (AvroScheme.) "/Users/chris/raw"))
 (def out-tap (Lfs. (AvroScheme. schema/user-schema) "example/output"))
 
 (defn filter-ts-if
