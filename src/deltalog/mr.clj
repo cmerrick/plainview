@@ -16,16 +16,9 @@
 
 (defn make-fields [fields] (Fields. (into-array fields)))
 
-(defn make-splitter
-  "Creates a JSON parser that will extract each field from the input
-  JSON object. The resultant fields will have the same names as they do
-  in the json object."
-  [json-paths]
-  (JSONSplitter. (make-fields json-paths) (into-array json-paths)))
-
 ; This creates a tap that will read a text file line-by-line.
 ; The resultant field will be named "line".
-(def in-tap (Hfs. (AvroScheme.) "example/raw/raw-372.avro"))
+(def in-tap (Hfs. (AvroScheme.) "example/raw"))
 (def out-tap (Hfs. (AvroScheme. schema/user-schema) "example/output" true))
 
 (defn filter-ts-if
@@ -41,16 +34,16 @@
 
 (defn -main
   [& args]
-  (let [copy-pipe (Pipe. "copy")
-        #_(tail-pipe (-> splitter-pipe
-                          (filter-ts-if (first args))
-                          (GroupBy. (make-fields ["id"])
-                                    (make-fields ["timestamp"]))
-                          (Every. Fields/ALL (Last.) Fields/RESULTS)))
+  (let [raw-pipe (Pipe. "user")
+        tail-pipe (-> raw-pipe
+                      (filter-ts-if (first args))
+                      (GroupBy. (make-fields ["id"])
+                                (make-fields ["timestamp"]))
+                      (Every. Fields/ALL (Last.) Fields/RESULTS))
 
         flow-def (-> (FlowDef/flowDef)
-                     (.addSource copy-pipe in-tap)
-                     (.addTailSink copy-pipe out-tap))]
+                     (.addSource raw-pipe in-tap)
+                     (.addTailSink tail-pipe out-tap))]
 
     (let [flow (.connect (HadoopFlowConnector.) flow-def)]
       (doto flow

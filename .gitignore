@@ -8,4 +8,6 @@ pom.xml.asc
 /.lein-*
 /.nrepl-port
 example/output
+example/raw
+example/*.dot
 .fuse_hidden*

@@ -75,4 +75,4 @@
     (.setBinlogEventListener listener)))
 
 (defn -main []
-  (.start (replicator "mysql-bin.000003" 8476 (MyListener.))))
+  (.start (replicator "mysql-bin.000001" 1168 (MyListener.))))
