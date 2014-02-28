@@ -1,7 +1,9 @@
 (ns deltalog.mr
+  (:require [deltalog.schema :as schema])
   (:import [org.apache.hadoop.fs Path FileSystem]
            [org.apache.hadoop.conf Configuration]
            [cascading.tap.hadoop Hfs]
+           [cascading.avro AvroScheme]
            [cascading.scheme.hadoop TextDelimited TextLine]
            [cascading.tuple Fields]
            [cascading.operation.expression ExpressionFilter]
@@ -24,10 +26,10 @@
 ; The resultant field will be named "line".
 (def in-tap (Hfs. (TextLine. (make-fields ["line"])) "example/input.json"))
 
-(def out-tap (Hfs. (TextLine.) "example/output" true))
+(def out-tap (Hfs. (AvroScheme. (schema/avro-schema)) "example/output" true))
 
 (defn -main []
-  (let [json-paths ["id" "timestamp" "is-delete" "data"]
+  (let [json-paths ["id" "timestamp" "is_delete" "data"]
 
         splitter-pipe (Each. "json_split" (make-splitter json-paths))
         tail-pipe (-> splitter-pipe

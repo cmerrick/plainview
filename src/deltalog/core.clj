@@ -12,7 +12,7 @@
 (defn write-data [table-id ts pk delete? data]
   (let [ out {:timestamp ts
               :id (coerce pk)
-              :is-delete delete?
+              :is_delete delete?
               :data (map coerce data)}]
     (spit (str root-dir table-id) (str (generate-string out) "\n") :append true)))
 
