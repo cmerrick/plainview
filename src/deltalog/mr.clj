@@ -31,8 +31,8 @@
 
         splitter-pipe (Each. "json_split" (make-splitter json-paths))
         tail-pipe (-> splitter-pipe
-                      (Each. (make-fields ["timestamp"])
-                             (ExpressionFilter. "timestamp >= 1393542318" Long/TYPE))
+                      ;(Each. (make-fields ["timestamp"])
+                      ;       (ExpressionFilter. "timestamp >= 1393542318" Long/TYPE))
                       (GroupBy. (make-fields ["id"])
                                 (make-fields ["timestamp"]))
                       (Every. Fields/ALL (Last.) Fields/RESULTS))
