@@ -4,6 +4,7 @@
            [cascading.tap.hadoop Hfs]
            [cascading.scheme.hadoop TextDelimited TextLine]
            [cascading.tuple Fields]
+           [cascading.operation.expression ExpressionFilter]
            [cascading.pipe Pipe Each GroupBy Every]
            [cascading.operation.aggregator Last] ; for learning
            [cascading.flow Flow FlowDef]
@@ -30,7 +31,12 @@
 
         splitter (make-splitter json-paths)
         splitter-pipe (Each. "json_split" splitter)
-        group-pipe (GroupBy. splitter-pipe (make-fields ["id"]) (make-fields ["timestamp"]))
+        filter-pipe (Each. splitter-pipe
+                           (make-fields ["timestamp"])
+                           (ExpressionFilter. "timestamp >= 1393542318" Long/TYPE))
+        group-pipe (GroupBy. filter-pipe
+                             (make-fields ["id"])
+                             (make-fields ["timestamp"]))
         max-pipe (Every. group-pipe Fields/ALL (Last.) Fields/RESULTS)
 
         flow-def (-> (FlowDef/flowDef)
