@@ -1,7 +1,7 @@
 (ns repwrite.coerce
   (:import [com.google.code.or.common.glossary.column
             Int24Column DecimalColumn DoubleColumn
-            EnumColumn FloatColumn LongColumn]))
+            EnumColumn FloatColumn LongColumn BlobColumn]))
 
 (defmulti coerce class)
 
@@ -11,6 +11,7 @@
 (defmethod coerce EnumColumn [c] (.getValue c))
 (defmethod coerce FloatColumn [c] (.getValue c))
 (defmethod coerce LongColumn [c] (.getValue c))
+(defmethod coerce BlobColumn [c] (String. (.getValue c)))
 
 (defmethod coerce :default
   [c]

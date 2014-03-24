@@ -27,10 +27,10 @@
                       (avro/data-file-writer schema filename))]
       (.append adf data))))
 
-(defn write-json [{:keys [data] :as event}]
+(defn write-json [{:keys [data table-id] :as event}]
   (when (not (empty? data))
-    (let [filename (str root-dir "raw.json")]
-      (spit filename (str (generate-string data) "\n") :append true))))
+    (let [filename (str root-dir table-id ".json")]
+      (spit filename (str (generate-string event) "\n") :append true))))
 
 (defmulti parse-event-data class)
 (defmethod parse-event-data WriteRowsEvent
@@ -50,7 +50,14 @@
 (defmulti parse-meta-data class)
 (defmethod parse-meta-data AbstractRowEvent
   [e]
-  {:table-id (.getTableId e)})
+  {:table-id (.getTableId e)
+   :timestamp (.getTimestamp (.getHeader e))
+   :tombstone false})
+(defmethod parse-meta-data DeleteRowsEvent
+  [e]
+  {:table-id (.getTableId e)
+   :timestamp (.getTimestamp (.getHeader e))
+   :tombstone true})
 (defmethod parse-meta-data :default
   [e]
   {})
@@ -59,15 +66,14 @@
   BinlogEventListener
   (onEvents
     [this e]
-    (write-json (conj (parse-meta-data e)
-                     {:data (parse-event-data e)}))))
+    (write-json (conj {:data (parse-event-data e)} (parse-meta-data e)))))
 
 (defn replicator
   "get a replicator"
-  [{:keys [host port filename position] :as opts} listener]
+  [{:keys [username password host port filename position] :as opts} listener]
   (doto (OpenReplicator.)
-    (.setUser "replication-user")
-    (.setPassword "password")
+    (.setUser username)
+    (.setPassword password)
     (.setHost host)
     (.setPort port)
     (.setServerId 1234)
@@ -78,10 +84,12 @@
 (def cli-options
   [["-h" "--host HOST" "Replication master hostname or IP"
     :default "127.0.0.1"]
-   ["-p" "--port PORT" "Replication master port number"
+   ["-P" "--port PORT" "Replication master port number"
     :default 3306
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
+   ["-u" "--username USERNAME" "MySQL username"]
+   ["-p" "--password PASSWORD" "MySQL password"]
    ["-f" "--filename FILENAME" "Binlog filename"]
    ["-n" "--position POSITION" "Binlog position"
     :parse-fn #(Integer/parseInt %)]])
@@ -99,6 +107,8 @@
     (cond
      errors (exit 1 (error-msg errors))
      (nil? (:filename options)) (exit 1 "A replication filename must be specified")
-     (nil? (:position options)) (exit 1 "A replication position must be specified"))
+     (nil? (:position options)) (exit 1 "A replication position must be specified")
+     (nil? (:username options)) (exit 1 "A replication username must be specified")
+     (nil? (:password options)) (exit 1 "A replication password must be specified"))
     (mk-dir root-dir)
     (.start (replicator options (MyListener.)))))

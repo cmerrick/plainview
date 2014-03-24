@@ -1,4 +1,4 @@
-(ns deltalog.core-test
+(ns repwrite.core-test
   (:use midje.sweet)
   (:require [repwrite.core :refer :all])
   (:import [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
