@@ -1,4 +1,4 @@
-(ns deltalog.schema
+(ns repwrite.schema
   (:require [abracad.avro :as avro])
   (:import [org.apache.avro Schema$Parser]))
 

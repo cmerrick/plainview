@@ -1,4 +1,4 @@
-(ns deltalog.coerce
+(ns repwrite.coerce
   (:import [com.google.code.or.common.glossary.column
             Int24Column DecimalColumn DoubleColumn
             EnumColumn FloatColumn LongColumn]))

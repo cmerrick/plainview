@@ -1,14 +1,19 @@
-# deltalog
+# repwrite
 
-A Clojure library designed to ... well, that part is up to you.
+tap into your database's replication system and write all change data down to a file
 
-## Usage
+## usage
 
-FIXME
+_currently only support MySQL row-based replication_
 
-## License
+```bash
+lein run -m repwrite.core -f mysql-bin.000001 -n 8779 -p 5001
+```
 
-Copyright © 2014 FIXME
+in your my.cnf:
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+```
+server-id = 1234
+log-bin=mysql-bin
+binlog_format=row
+```

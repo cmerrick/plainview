@@ -1,5 +1,5 @@
-(ns deltalog.mr
-  (:require [deltalog.schema :as schema])
+(ns repwrite.mr
+  (:require [repwrite.schema :as schema])
   (:import [org.apache.hadoop.fs Path FileSystem]
            [org.apache.hadoop.conf Configuration]
            [cascading.tap SinkMode]
