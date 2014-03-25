@@ -12,3 +12,6 @@ example/raw
 example/*.dot
 .fuse_hidden*
 /*.java
+.env
+#*
+.#*

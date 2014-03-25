@@ -4,14 +4,13 @@
             [cheshire.core :refer :all]
             [abracad.avro :as avro]
             [clojure.string :as string]
-            [clojure.tools.cli :refer [parse-opts]])
+            [clojure.tools.cli :refer [parse-opts]]
+            [amazonica.aws.kinesis :as kinesis])
   (:import [com.google.code.or OpenReplicator]
            [com.google.code.or.binlog BinlogEventListener]
            [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
             TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent])
   (:gen-class))
-
-#_(defn root-dir [table-id] (str "example/raw/" table-id))
 
 (def root-dir (str "example/raw/"))
 
@@ -31,6 +30,10 @@
   (when (not (empty? data))
     (let [filename (str root-dir table-id ".json")]
       (spit filename (str (generate-string event) "\n") :append true))))
+
+(defn write-kinesis [{:keys [data table-id] :as event}]
+  (when (not (empty? data))
+    (kinesis/put-record "chris-rep" data table-id)))
 
 (defmulti parse-event-data class)
 (defmethod parse-event-data WriteRowsEvent
@@ -66,7 +69,7 @@
   BinlogEventListener
   (onEvents
     [this e]
-    (write-json (conj {:data (parse-event-data e)} (parse-meta-data e)))))
+    (write-kinesis (conj {:data (parse-event-data e)} (parse-meta-data e)))))
 
 (defn replicator
   "get a replicator"

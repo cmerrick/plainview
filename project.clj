@@ -18,4 +18,5 @@
                                cascading/cascading-core]]
                  [org.apache.avro/avro "1.7.4" :exclusions [org.slf4j/slf4j-api]]
                  [com.damballa/abracad "0.4.9"]
-                 [midje "1.6.3"]])
+                 [midje "1.6.3"]
+                 [amazonica "0.2.10"]])
