@@ -26,14 +26,18 @@
                       (avro/data-file-writer schema filename))]
       (.append adf data))))
 
-(defn write-json [{:keys [data table-id] :as event}]
+(defn- string->buff [s]
+  (-> (.getBytes s "utf-8")
+      (java.nio.ByteBuffer/wrap)))
+
+(defn write-json [{:keys [data tableid] :as event}]
   (when (not (empty? data))
-    (let [filename (str root-dir table-id ".json")]
+    (let [filename (str root-dir tableid ".json")]
       (spit filename (str (generate-string event) "\n") :append true))))
 
-(defn write-kinesis [{:keys [data table-id] :as event}]
+(defn write-kinesis [{:keys [data tableid] :as event}]
   (when (not (empty? data))
-    (kinesis/put-record "chris-rep" data table-id)))
+    (kinesis/put-record "chris-rep" (string->buff (generate-string event)) data tableid)))
 
 (defmulti parse-event-data class)
 (defmethod parse-event-data WriteRowsEvent
@@ -53,12 +57,12 @@
 (defmulti parse-meta-data class)
 (defmethod parse-meta-data AbstractRowEvent
   [e]
-  {:table-id (.getTableId e)
+  {:tableid (.getTableId e)
    :timestamp (.getTimestamp (.getHeader e))
    :tombstone false})
 (defmethod parse-meta-data DeleteRowsEvent
   [e]
-  {:table-id (.getTableId e)
+  {:tableid (.getTableId e)
    :timestamp (.getTimestamp (.getHeader e))
    :tombstone true})
 (defmethod parse-meta-data :default

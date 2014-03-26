@@ -11,7 +11,7 @@
 (defmethod coerce EnumColumn [c] (.getValue c))
 (defmethod coerce FloatColumn [c] (.getValue c))
 (defmethod coerce LongColumn [c] (.getValue c))
-(defmethod coerce BlobColumn [c] (String. (.getValue c)))
+(defmethod coerce BlobColumn [c] (String. (.getValue c) "UTF-8"))
 
 (defmethod coerce :default
   [c]

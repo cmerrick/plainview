@@ -4,7 +4,10 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :repositories [["conjars" {:url "http://conjars.org/repo"}]]
-  :dependencies [[org.clojure/clojure "1.5.1"]
+  :source-paths ["src/clj"]
+  :test-paths ["test/clj/"]
+  :java-source-paths ["src/java"]
+  :dependencies [[org.clojure/clojure "1.6.0"]
                  [open-replicator/open-replicator "1.0.5"]
                  [org.apache.hadoop/hadoop-core "1.1.2"]
                  [cascading/cascading-hadoop "2.2.0"]
@@ -19,4 +22,7 @@
                  [org.apache.avro/avro "1.7.4" :exclusions [org.slf4j/slf4j-api]]
                  [com.damballa/abracad "0.4.9"]
                  [midje "1.6.3"]
-                 [amazonica "0.2.10"]])
+                 [amazonica "0.2.10"]
+                 [com.amazonaws/aws-java-sdk "1.7.4"]
+                 [com.amazonaws/amazon-kinesis-client "1.0.0"]]
+  :plugins [[lein-midje "3.0.1"]])
