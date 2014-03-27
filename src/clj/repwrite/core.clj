@@ -2,7 +2,6 @@
   (:require [repwrite.coerce :refer [coerce]]
             [repwrite.schema :as schema]
             [cheshire.core :refer :all]
-            [abracad.avro :as avro]
             [clojure.string :as string]
             [clojure.tools.cli :refer [parse-opts]]
             [amazonica.aws.kinesis :as kinesis])
@@ -12,32 +11,13 @@
             TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent])
   (:gen-class))
 
-(def root-dir (str "example/raw/"))
-
-(defn mk-dir [dir]
-  (.mkdir (java.io.File. dir))
-  dir)
-
-(defn write-avro [{:keys [table-id]} data]
-  (let [filename (str (mk-dir (root-dir table-id)) "/raw.avro")
-        schema (schema/tableid->schema table-id)]
-    (with-open [adf (if (.exists (clojure.java.io/as-file filename))
-                      (avro/data-file-writer filename)
-                      (avro/data-file-writer schema filename))]
-      (.append adf data))))
-
 (defn- string->buff [s]
   (-> (.getBytes s "utf-8")
       (java.nio.ByteBuffer/wrap)))
 
-(defn write-json [{:keys [data tableid] :as event}]
+(defn write-kinesis [stream {:keys [data tableid] :as event}]
   (when (not (empty? data))
-    (let [filename (str root-dir tableid ".json")]
-      (spit filename (str (generate-string event) "\n") :append true))))
-
-(defn write-kinesis [{:keys [data tableid] :as event}]
-  (when (not (empty? data))
-    (kinesis/put-record "chris-rep" (string->buff (generate-string event)) data tableid)))
+    (kinesis/put-record stream (string->buff (generate-string event)) tableid)))
 
 (defmulti parse-event-data class)
 (defmethod parse-event-data WriteRowsEvent
@@ -69,11 +49,11 @@
   [e]
   {})
 
-(deftype MyListener []
+(deftype MyListener [stream]
   BinlogEventListener
   (onEvents
     [this e]
-    (write-kinesis (conj {:data (parse-event-data e)} (parse-meta-data e)))))
+    (write-kinesis stream (conj {:data (parse-event-data e)} (parse-meta-data e)))))
 
 (defn replicator
   "get a replicator"
@@ -99,7 +79,8 @@
    ["-p" "--password PASSWORD" "MySQL password"]
    ["-f" "--filename FILENAME" "Binlog filename"]
    ["-n" "--position POSITION" "Binlog position"
-    :parse-fn #(Integer/parseInt %)]])
+    :parse-fn #(Integer/parseInt %)]
+   ["-s" "--stream STREAM" "Kinesis stream name"]])
 
 (defn error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
@@ -116,6 +97,6 @@
      (nil? (:filename options)) (exit 1 "A replication filename must be specified")
      (nil? (:position options)) (exit 1 "A replication position must be specified")
      (nil? (:username options)) (exit 1 "A replication username must be specified")
-     (nil? (:password options)) (exit 1 "A replication password must be specified"))
-    (mk-dir root-dir)
-    (.start (replicator options (MyListener.)))))
+     (nil? (:password options)) (exit 1 "A replication password must be specified")
+     (nil? (:stream options)) (exit 1 "A kinesis stream name must be specified"))
+    (.start (replicator options (MyListener. (:stream options))))))
