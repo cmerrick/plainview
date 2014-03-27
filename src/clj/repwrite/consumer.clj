@@ -23,11 +23,19 @@
              (:partition-key row)))
   records)
 
+(defn records->string [records]
+  (let [all-rows (for [record records
+                       row (get-in record [:data "data"])]
+                   (assoc (:data record) "data" row))]
+    (->> all-rows
+        (map generate-string)
+        (clojure.string/join \newline))))
+
 (defn s3-emitter [bucket records]
   (let [tableid (:partition-key (first records))
         filename (str (:sequence-number (first records)) "-" (:sequence-number (last records)))
-        bytes (to-bytes (generate-string records))]
-    (s3/put-object :bucket-name bucket
+        bytes (to-bytes (records->string records))]
+    (s3/put-object :bucket-name (str bucket "/" tableid)
                    :key filename
                    :input-stream (to-stream bytes)
                    :metadata {:content-length (count bytes)})))

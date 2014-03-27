@@ -14,12 +14,24 @@
            [cascading.flow.hadoop HadoopFlowConnector]
            [cascading.json.operation JSONSplitter JSONFlatten]))
 
-(defn make-fields [fields] (Fields. (into-array fields)))
+(defn fields [fields] (Fields. (into-array fields)))
 
 ; This creates a tap that will read a text file line-by-line.
 ; The resultant field will be named "line".
-(def in-tap (Hfs. (AvroScheme.) "example/raw"))
-(def out-tap (Hfs. (AvroScheme. schema/user-schema) "example/output" true))
+(def avro-in-tap (Hfs. (AvroScheme.) "example/raw"))
+(def avro-out-tap (Hfs. (AvroScheme. schema/user-schema) "example/output" true))
+
+; This creates a tap that will read a text file line-by-line.
+; The resultant field will be named "line".
+(def json-in-tap (Hfs. (TextLine. (fields ["line"])) "example/input.json"))
+(def json-out-tap (Hfs. (TextLine.) "example/output" true))
+
+(defn make-splitter
+  "Creates a JSON parser that will extract each field from the input
+  JSON object. The resultant fields will have the same names as they do
+  in the json object."
+  [json-paths]
+  (JSONSplitter. (fields json-paths) (into-array json-paths)))
 
 (defn filter-ts-if
   "If timestamp evaluates to true, then this will create a new
@@ -28,22 +40,24 @@
   [pipe timestamp]
   (if timestamp
     (Each. pipe
-           (make-fields ["timestamp"])
+           (fields ["timestamp"])
            (ExpressionFilter. (str "timestamp >= " timestamp) Long/TYPE))
     pipe))
 
 (defn -main
   [& args]
-  (let [raw-pipe (Pipe. "user")
-        tail-pipe (-> raw-pipe
-                      (filter-ts-if (first args))
-                      (GroupBy. (make-fields ["id"])
-                                (make-fields ["timestamp"]))
-                      (Every. Fields/ALL (Last.) Fields/RESULTS))
+  (let [json-paths ["timestamp" "tombstone" "tableid" "data"]
+        splitter-pipe (Each. "json_split" (make-splitter json-paths))
+
+        tail-pipe (-> splitter-pipe
+                      #_(filter-ts-if (first args))
+                      #_(GroupBy. (fields ["timestamp"]))
+                      #_(Every. Fields/ALL (Last.) Fields/RESULTS)
+                      )
 
         flow-def (-> (FlowDef/flowDef)
-                     (.addSource raw-pipe in-tap)
-                     (.addTailSink tail-pipe out-tap))]
+                     (.addSource splitter-pipe json-in-tap)
+                     (.addTailSink tail-pipe json-out-tap))]
 
     (let [flow (.connect (HadoopFlowConnector.) flow-def)]
       (doto flow
