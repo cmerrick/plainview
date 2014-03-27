@@ -1,4 +1,4 @@
-(ns repwrite.core
+(ns repwrite.producer
   (:require [repwrite.coerce :refer [coerce]]
             [repwrite.schema :as schema]
             [cheshire.core :refer :all]
