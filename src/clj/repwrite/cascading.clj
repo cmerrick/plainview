@@ -1,10 +1,8 @@
-(ns repwrite.mr
-  (:require [repwrite.schema :as schema])
+(ns repwrite.cascading
   (:import [org.apache.hadoop.fs Path FileSystem]
            [org.apache.hadoop.conf Configuration]
            [cascading.tap SinkMode]
            [cascading.tap.hadoop Hfs Lfs]
-           [cascading.avro AvroScheme]
            [cascading.scheme.hadoop TextDelimited TextLine]
            [cascading.tuple Fields]
            [cascading.operation.expression ExpressionFilter]
@@ -15,11 +13,6 @@
            [cascading.json.operation JSONSplitter JSONFlatten]))
 
 (defn fields [fields] (Fields. (into-array fields)))
-
-; This creates a tap that will read a text file line-by-line.
-; The resultant field will be named "line".
-(def avro-in-tap (Hfs. (AvroScheme.) "example/raw"))
-(def avro-out-tap (Hfs. (AvroScheme. schema/user-schema) "example/output" true))
 
 ; This creates a tap that will read a text file line-by-line.
 ; The resultant field will be named "line".
@@ -44,8 +37,7 @@
            (ExpressionFilter. (str "timestamp >= " timestamp) Long/TYPE))
     pipe))
 
-(defn -main
-  [& args]
+(defn do-cascading []
   (let [json-paths ["timestamp" "tombstone" "tableid" "data"]
         splitter-pipe (Each. "json_split" (make-splitter json-paths))
 
@@ -63,3 +55,7 @@
       (doto flow
         (.writeDOT "example/flow.dot")
         (.complete)))))
+
+(defn -main
+  [& args]
+  (do-cascading))

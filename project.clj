@@ -10,8 +10,8 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [open-replicator/open-replicator "1.0.5"]
                  [org.apache.hadoop/hadoop-core "1.1.2"]
-                 [cascading/cascading-hadoop "2.2.0"]
-                 [cascading/cascading-local "2.2.0"]
+                 [cascading/cascading-hadoop "2.5.3"]
+                 [cascading/cascading-local "2.5.3"]
                  [cascading.gmarabout/cascading-json "0.0.3"]
                  [cheshire "5.3.1"]
                  [org.clojure/tools.cli "0.3.1"]
@@ -23,6 +23,5 @@
                  [com.damballa/abracad "0.4.9"]
                  [midje "1.6.3"]
                  [amazonica "0.2.10"]
-                 [com.amazonaws/aws-java-sdk "1.7.4"]
-                 [com.amazonaws/amazon-kinesis-client "1.0.0"]]
+                 [cascalog "2.0.0"]]
   :plugins [[lein-midje "3.0.1"]])

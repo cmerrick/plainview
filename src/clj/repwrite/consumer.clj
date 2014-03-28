@@ -32,13 +32,14 @@
         (clojure.string/join \newline))))
 
 (defn s3-emitter [bucket records]
-  (let [tableid (:partition-key (first records))
-        filename (str (:sequence-number (first records)) "-" (:sequence-number (last records)))
-        bytes (to-bytes (records->string records))]
-    (s3/put-object :bucket-name (str bucket "/" tableid)
-                   :key filename
-                   :input-stream (to-stream bytes)
-                   :metadata {:content-length (count bytes)})))
+  (let [by-table (group-by :partition-key records)]
+    (doseq [[tableid table-records] (map identity by-table)]
+      (let [filename (str (:sequence-number (first table-records)))
+            bytes (to-bytes (records->string table-records))]
+        (s3/put-object :bucket-name (str bucket "/" tableid)
+                       :key filename
+                       :input-stream (to-stream bytes)
+                       :metadata {:content-length (count bytes)})))))
 
 (defn- create-worker [{:keys [app bucket stream] :as options}]
   (kinesis/worker! :app app

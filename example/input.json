@@ -1,3 +1,3 @@
-{"id": 1, "timestamp": 1393542318, "is_delete": 0, "data": [1, "buck", "fryan@rjmetrics.com", 1]}
-{"id": 1, "timestamp": 1393542221, "is_delete": 0, "data": [1, "buck", "fryan@rjmetrics.com", 0]}
-{"id": 2, "timestamp": 1393542283, "is_delete": 0, "data": [2, "chris", "cmerrick@rjmetrics.com", 0]}
+{"timestamp": 1393542318, "tombstone": false, "tableid": 1, "data": [1, "buck", "fryan@rjmetrics.com", 1]}
+{"timestamp": 1393542221, "tombstone": false, "tableid": 1, "data": [1, "buck", "fryan@rjmetrics.com", 0]}
+{"timestamp": 1393542283, "tombstone": false, "tableid": 1, "data": [2, "chris", "cmerrick@rjmetrics.com", 0]}
