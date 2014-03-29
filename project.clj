@@ -7,7 +7,7 @@
   :source-paths ["src/clj"]
   :test-paths ["test/clj/"]
   :java-source-paths ["src/java"]
-  :dependencies [[org.clojure/clojure "1.6.0"]
+  :dependencies [[org.clojure/clojure "1.5.0"]
                  [open-replicator/open-replicator "1.0.5"]
                  [org.apache.hadoop/hadoop-core "1.1.2"]
                  [cascading/cascading-hadoop "2.5.3"]
