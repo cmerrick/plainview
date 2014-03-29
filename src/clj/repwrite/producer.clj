@@ -17,7 +17,27 @@
 
 (defn write-kinesis [stream {:keys [data tableid] :as event}]
   (when (not (empty? data))
-    (kinesis/put-record stream (string->buff (generate-string event)) tableid)))
+    (kinesis/put-record
+     stream
+     (string->buff (generate-string event)) tableid))) ;; probably shouldn't use tableid as partition key
+
+(def table-map (atom {}))
+
+(defn tableid->fullname [tableid]
+  (if-let [table-info (get @table-map tableid)]
+    (str (:db table-info) "." (:table table-info))
+    "unknown"))
+
+(defmulti pre-parse-event class)
+(defmethod pre-parse-event TableMapEvent
+  [e]
+  (swap! table-map #(assoc %
+                      (.getTableId e)
+                      {:db (.getDatabaseName e) :table (.getTableName e)})))
+
+(defmethod pre-parse-event :default
+  [e]
+  nil)
 
 (defmulti parse-event-data class)
 (defmethod parse-event-data WriteRowsEvent
@@ -37,12 +57,14 @@
 (defmulti parse-meta-data class)
 (defmethod parse-meta-data AbstractRowEvent
   [e]
-  {:tableid (.getTableId e)
+  {:table (tableid->fullname (.getTableId e))
+   :tableid (.getTableId e)
    :timestamp (.getTimestamp (.getHeader e))
    :tombstone false})
 (defmethod parse-meta-data DeleteRowsEvent
   [e]
-  {:tableid (.getTableId e)
+  {:table (tableid->fullname (.getTableId e))
+   :tableid (.getTableId e)
    :timestamp (.getTimestamp (.getHeader e))
    :tombstone true})
 (defmethod parse-meta-data :default
@@ -53,6 +75,7 @@
   BinlogEventListener
   (onEvents
     [this e]
+    (pre-parse-event e)
     (write-kinesis stream (conj {:data (parse-event-data e)} (parse-meta-data e)))))
 
 (defn replicator
