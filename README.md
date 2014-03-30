@@ -1,4 +1,4 @@
-# plainview
+## plainview
 
 A toolkit for building a data pipeline from your database's binary log stream.
 
@@ -18,7 +18,7 @@ Credit goes to the folks at LinkedIn for pioneering this approach - read Jay Kre
  - stronger schema-ing of data
 
 
-## usage for mysql
+### usage
 
 ```bash
 lein run -m plainview.producer -f mysql-bin.000001 -n 8779 -P 5001 -u replication-user -p password -s kinesis-stream-name
