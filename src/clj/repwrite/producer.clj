@@ -23,17 +23,15 @@
 
 (def table-map (atom {}))
 
-(defn tableid->fullname [tableid]
-  (if-let [table-info (get @table-map tableid)]
-    (str (:db table-info) "." (:table table-info))
-    "unknown"))
+(defn query-table-map [tableid]
+  (get @table-map tableid {:database "_unknown" :table "_unknown"}))
 
 (defmulti pre-parse-event class)
 (defmethod pre-parse-event TableMapEvent
   [e]
   (swap! table-map #(assoc %
                       (.getTableId e)
-                      {:db (.getDatabaseName e) :table (.getTableName e)})))
+                      {:database (coerce (.getDatabaseName e)) :table (coerce (.getTableName e))})))
 
 (defmethod pre-parse-event :default
   [e]
@@ -57,16 +55,18 @@
 (defmulti parse-meta-data class)
 (defmethod parse-meta-data AbstractRowEvent
   [e]
-  {:table (tableid->fullname (.getTableId e))
-   :tableid (.getTableId e)
-   :timestamp (.getTimestamp (.getHeader e))
-   :tombstone false})
+  (let [tableid (.getTableId e)
+        header {:tableid tableid
+                :timestamp (.getTimestamp (.getHeader e))
+                :tombstone false}]
+    (merge header (query-table-map tableid))))
 (defmethod parse-meta-data DeleteRowsEvent
   [e]
-  {:table (tableid->fullname (.getTableId e))
-   :tableid (.getTableId e)
-   :timestamp (.getTimestamp (.getHeader e))
-   :tombstone true})
+  (let [tableid (.getTableId e)
+        header {:tableid tableid
+                :timestamp (.getTimestamp (.getHeader e))
+                :tombstone true}]
+    (merge header (query-table-map tableid))))
 (defmethod parse-meta-data :default
   [e]
   {})

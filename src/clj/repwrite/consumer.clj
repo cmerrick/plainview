@@ -16,30 +16,30 @@
 (defn- to-stream [bytes]
   (java.io.ByteArrayInputStream. bytes))
 
-(defn stdout-emitter [records]
-  (doseq [row records]
-    (println (:data row)
-             (:sequence-number row)
-             (:partition-key row)))
-  records)
+(defn vec->json [rows]
+  (->> rows
+       (map generate-string)
+       (clojure.string/join \newline)))
 
-(defn records->string [records]
-  (let [all-rows (for [record records
-                       row (get-in record [:data "data"])]
-                   (assoc (:data record) "data" row))]
-    (->> all-rows
-        (map generate-string)
-        (clojure.string/join \newline))))
+(defn flatten-records [records]
+  (for [record records
+        row (get-in record [:data "data"])]
+    (assoc (:data record) "data" row "sequence-number" (:sequence-number record))))
 
 (defn s3-emitter [bucket records]
-  (let [by-table (group-by :partition-key records)]
-    (doseq [[tableid table-records] (map identity by-table)]
-      (let [filename (str (:sequence-number (first table-records)))
-            bytes (to-bytes (records->string table-records))]
-        (s3/put-object :bucket-name (str bucket "/" tableid)
+  (let [flattened (flatten-records records)
+        by-table (group-by #(str (get % "database") "." (get % "table")) flattened)]
+    (doseq [[fqtn table-rows] (map identity by-table)]
+      (let [sample (first table-rows)
+            filename (str (get sample "sequence-number"))
+            database (get sample "database")
+            table (get sample "table")
+            bytes (to-bytes (vec->json (map #(dissoc % "sequence-number") table-rows)))]
+        (s3/put-object :bucket-name (str bucket "/" database "/" table)
                        :key filename
                        :input-stream (to-stream bytes)
-                       :metadata {:content-length (count bytes)})))))
+                       :metadata {:content-length (count bytes)}))))
+  nil)
 
 (defn- create-worker [{:keys [app bucket stream] :as options}]
   (kinesis/worker! :app app
@@ -47,7 +47,7 @@
                    :checkpoint false ;; default to disabled checkpointing, can still force
                    ;; a checkpoint by returning true from the processor function
                    :deserializer to-json
-                   :processor (comp (partial s3-emitter bucket) stdout-emitter)))
+                   :processor (partial s3-emitter bucket)))
 
 (def cli-options
   [["-a" "--app APPLICATION" "Kinesis application name"]
