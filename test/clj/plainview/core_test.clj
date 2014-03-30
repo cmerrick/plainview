@@ -1,6 +1,6 @@
-(ns repwrite.core-test
+(ns plainview.core-test
   (:use midje.sweet)
-  (:require [repwrite.producer :refer :all])
+  (:require [plainview.producer :refer :all])
   (:import [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
             TableMapEvent QueryEvent DeleteRowsEvent BinlogEventV4HeaderImpl]
            [com.google.code.or.common.glossary Row Pair]

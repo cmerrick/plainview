@@ -1,6 +1,5 @@
-(ns repwrite.producer
-  (:require [repwrite.coerce :refer [coerce]]
-            [repwrite.schema :as schema]
+(ns plainview.producer
+  (:require [plainview.coerce :refer [coerce]]
             [cheshire.core :refer :all]
             [clojure.string :as string]
             [clojure.tools.cli :refer [parse-opts]]

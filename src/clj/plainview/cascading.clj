@@ -1,4 +1,4 @@
-(ns repwrite.cascading
+(ns plainview.cascading
   (:import [org.apache.hadoop.fs Path FileSystem]
            [org.apache.hadoop.conf Configuration]
            [cascading.tap SinkMode]

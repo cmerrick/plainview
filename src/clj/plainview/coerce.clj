@@ -1,4 +1,4 @@
-(ns repwrite.coerce
+(ns plainview.coerce
   (:import [com.google.code.or.common.glossary.column
             Int24Column DecimalColumn DoubleColumn
             EnumColumn FloatColumn LongColumn BlobColumn]))

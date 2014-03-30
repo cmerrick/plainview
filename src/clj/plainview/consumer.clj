@@ -1,4 +1,4 @@
-(ns repwrite.consumer
+(ns plainview.consumer
   (:require [cheshire.core :refer :all]
             [amazonica.aws.kinesis :as kinesis]
             [amazonica.aws.s3 :as s3]

@@ -1,4 +1,4 @@
-(ns repwrite.cascalog
+(ns plainview.cascalog
   (:require [cascalog.api :refer :all]
             [cheshire.core :refer :all]
             [cascalog.logic.def :as def]))
