@@ -15,19 +15,29 @@
       (java.nio.ByteBuffer/wrap)))
 
 (defn write-kinesis [stream {:keys [data tableid] :as event}]
+  ;; Not important, but you can use when-not or not-empty.
   (when (not (empty? data))
     (kinesis/put-record
      stream
      (string->buff (generate-string event)) tableid))) ;; probably shouldn't use tableid as partition key
 
+
+;; Is this a single-threaded program? If so, an atom is
+;; appropriate. If not, you should use a ref.
 (def table-map (atom {}))
 
+;; Does "_unknown" have some kind of special meaning? I would document
+;; this.
 (defn query-table-map [tableid]
   (get @table-map tableid {:database "_unknown" :table "_unknown"}))
 
+;; I would probably not use a multimethod for this. Since there's only
+;; one implementation, I would just use a regular fn. It would
+;; simplify this a bit.
 (defmulti pre-parse-event class)
 (defmethod pre-parse-event TableMapEvent
   [e]
+  ;; You don't need to make an anonymous function here. `(swap! table-map assoc ... )` will do `(assoc @table-map  ...)`
   (swap! table-map #(assoc %
                       (.getTableId e)
                       {:database (coerce (.getDatabaseName e)) :table (coerce (.getTableName e))})))
@@ -36,6 +46,9 @@
   [e]
   nil)
 
+;; I'm not sure that I'd use multimethods for this either, since
+;; there's a small number of events, their implementations are very
+;; simple, and they're all defined in one place.
 (defmulti parse-event-data class)
 (defmethod parse-event-data WriteRowsEvent
   [e]
@@ -51,6 +64,8 @@
   (println (str e "\n"))
   {})
 
+;; Also probably wouldn't use a multimethod for this. Especially since
+;; the implementations are so similar.
 (defmulti parse-meta-data class)
 (defmethod parse-meta-data AbstractRowEvent
   [e]
@@ -90,6 +105,7 @@
     (.setBinlogPosition position)
     (.setBinlogEventListener listener)))
 
+;; Does the "--host HOST" argument syntax work? 
 (def cli-options
   [["-h" "--host HOST" "Replication master hostname or IP"
     :default "127.0.0.1"]
@@ -108,6 +124,8 @@
   (str "The following errors occurred while parsing your command:\n\n"
        (string/join \newline errors)))
 
+;; You can maybe rename this to "fail" or something and get rid of
+;; status, since you only ever call it with status 1. 
 (defn exit [status msg]
   (println msg)
   (System/exit status))

@@ -24,11 +24,13 @@
 (defn flatten-records [records]
   (for [record records
         row (get-in record [:data "data"])]
+    ;; Maybe put each (key, value) pair on its own line for clarity
     (assoc (:data record) "data" row "sequence-number" (:sequence-number record))))
 
 (defn s3-emitter [bucket records]
   (let [flattened (flatten-records records)
         by-table (group-by #(str (get % "database") "." (get % "table")) flattened)]
+    ;; What's the purpose of mapping identity over by-table?
     (doseq [[fqtn table-rows] (map identity by-table)]
       (let [sample (first table-rows)
             filename (str (get sample "sequence-number"))
