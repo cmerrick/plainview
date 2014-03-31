@@ -1,11 +1,13 @@
 (ns plainview.producer
-  (:require [plainview.coerce :refer [coerce]]
-            [cheshire.core :refer :all]
+  (:require [cheshire.core :refer :all]
             [clojure.string :as string]
             [clojure.tools.cli :refer [parse-opts]]
             [amazonica.aws.kinesis :as kinesis])
   (:import [com.google.code.or OpenReplicator]
            [com.google.code.or.binlog BinlogEventListener]
+           [com.google.code.or.common.glossary.column
+            Int24Column DecimalColumn DoubleColumn
+            EnumColumn FloatColumn LongColumn BlobColumn]
            [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
             TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent RotateEvent])
   (:gen-class))
@@ -13,6 +15,18 @@
 ;; careful about using atoms if we ever use multiple threads
 (def table-map (atom {}))
 (def log-file (atom nil))
+
+(defmulti coerce class)
+(defmethod coerce Int24Column [c] (.getValue c))
+(defmethod coerce DecimalColumn [c] (.getValue c))
+(defmethod coerce DoubleColumn [c] (.getValue c))
+(defmethod coerce EnumColumn [c] (.getValue c))
+(defmethod coerce FloatColumn [c] (.getValue c))
+(defmethod coerce LongColumn [c] (.getValue c))
+(defmethod coerce BlobColumn [c] (String. (.getValue c) "UTF-8"))
+(defmethod coerce :default
+  [c]
+  (.toString c))
 
 (defn- string->buff [s]
   (-> (.getBytes s "utf-8")
@@ -37,10 +51,10 @@
 (defmethod pre-parse-event RotateEvent
   [e]
   (reset! log-file (coerce (.getBinlogFileName e))))
-
 (defmethod pre-parse-event :default
   [e]
   nil)
+
 
 (defmulti parse-event-data class)
 (defmethod parse-event-data WriteRowsEvent
