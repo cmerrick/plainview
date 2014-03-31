@@ -16,19 +16,90 @@ Credit goes to the folks at LinkedIn for pioneering this approach - read Jay Kre
 ### todo
  - listeners for PostgreSQL, MongoDB, (others)
  - stronger schema-ing of data
+ - process for capturing an initial state of the data
 
+### setup for mysql
 
-### usage
+How to use plainview to listen to your MySQL replication stream and write raw change data to Amazon S3.
 
-```bash
-lein run -m plainview.producer -f mysql-bin.000001 -n 8779 -P 5001 -u replication-user -p password -s kinesis-stream-name
-lein run -m plainview.consumer -a app-name -b bucket-name -s kinesis-stream-name
+##### 1. Setup your MySQL Server
+Your server needs to be configured as a replication master using the "row" binary log format.  Set
+the following in your server's my.cnf file:
+
 ```
-
-in your my.cnf:
-
-```
-server-id = 1234
 log-bin=mysql-bin
 binlog_format=row
+server-id=1234
 ```
+
+Where `log-bin` specifies the name to use to store binary log files, and `server-id` is a unique number to identify this server in the replication system.  Restart your mysql server to put the changes into effect.
+
+Finally, create a MySQL replication user:
+
+```sql
+mysql> GRANT REPLICATION SLAVE ON *.* TO '<repl-user>'@'192.168.%' IDENTIFIED BY '<repl-pass>';
+```
+
+Modify with an appropriate username and password, and replace `192.168.%` with the network address or subnet that you'll be connecting from.  Finally, grab the current position of the replication log:
+
+```bash
+mysql> show master status;
++------------------+-----------+--------------+------------------+
+| File             | Position  | Binlog_Do_DB | Binlog_Ignore_DB |
++------------------+-----------+--------------+------------------+
+| mysql-bin.000019 | 480798760 |              |                  |
++------------------+-----------+--------------+------------------+
+```
+
+##### 2. Setup a Kinesis Stream
+
+(TODO)
+
+##### 3. Run the plainview producer
+
+plainview's producer listens to your MySQL server's replication system and forwards data to the Kinesis stream you just setup.
+
+Clone this repository and run the following in your shell to give plainview access to the Kinesis stream you just setup:
+
+```
+export AWS_ACCESS_KEY=<your-key>
+export AWS_SECRET_KEY=<your-secret>
+```
+
+The key will need full permissions on Kinesis.  From the same shell, run the producer
+
+```bash
+lein run -m plainview.producer -i <server-id> -f <mysql-file> -n <mysql-position> -P <mysql-port> -u <repl-user> -p <repl-pass> -s <kinesis-stream>
+```
+
+Where
+ - `<server-id>` is the unique ID from your master MySQL server's my.cnf file
+ - `<mysql-file>` is the "File" that your master MySQL server reported in Step 1. (in this case, `mysql-bin.000019`)
+ - `<mysql-position>` is the "Position" that your master MySQL server reported in Step 1. (in this case, `480798760`)
+ - `<mysql-port>` is the port of your master MySQL server
+ - `<repl-user>` and `<repl-pass>` are the credentials you GRANTed permission to in Step 1.
+ - `<kinesis-stream>` is the name of the Kinesis stream from Step 2.
+
+The producer will run continuously, listening for updates coming through replication.
+
+##### 4. Run the plainview consumer
+
+plainview's consumer listens to a Kinesis stream for data from the producer and writes it to Amazon S3.
+
+Again run the following to give the code access to Amazon resources:
+
+```
+export AWS_ACCESS_KEY=<your-key>
+export AWS_SECRET_KEY=<your-secret>
+```
+
+This key will need read permission on Kinesis, full permission on DynamoDB, and permission to write to an S3 bucket.  From the same shell, run the consumer:
+
+```bash
+lein run -m plainview.consumer -a <kinesis-app> -b <s3-bucket> -s <kinesis-stream>
+```
+
+Where
+ - `<kinesis-app>` is a unique name for this consumer.  Kinesis uses this name to maintain the consumer's state.
+ - `<s3-bucket>` is the S3 bucket to write to
+ - `<kinesis-stream>` is the name fo the Kinesis stream from Step 2.

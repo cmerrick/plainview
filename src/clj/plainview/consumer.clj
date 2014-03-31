@@ -69,4 +69,5 @@
      (nil? (:app options)) (exit 1 "An application name must be specified")
      (nil? (:bucket options)) (exit 1 "A bucket name must be specified")
      (nil? (:stream options)) (exit 1 "A kinesis stream name must be specified"))
+    (s3/create-bucket (:bucket options))
     (create-worker options)))

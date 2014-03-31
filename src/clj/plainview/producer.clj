@@ -7,8 +7,12 @@
   (:import [com.google.code.or OpenReplicator]
            [com.google.code.or.binlog BinlogEventListener]
            [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
-            TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent])
+            TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent RotateEvent])
   (:gen-class))
+
+;; careful about using atoms if we ever use multiple threads
+(def table-map (atom {}))
+(def log-file (atom nil))
 
 (defn- string->buff [s]
   (-> (.getBytes s "utf-8")
@@ -20,7 +24,6 @@
      stream
      (string->buff (generate-string event)) tableid))) ;; probably shouldn't use tableid as partition key
 
-(def table-map (atom {}))
 
 (defn query-table-map [tableid]
   (get @table-map tableid {:database "_unknown" :table "_unknown"}))
@@ -31,6 +34,9 @@
   (swap! table-map #(assoc %
                       (.getTableId e)
                       {:database (coerce (.getDatabaseName e)) :table (coerce (.getTableName e))})))
+(defmethod pre-parse-event RotateEvent
+  [e]
+  (reset! log-file (coerce (.getBinlogFileName e))))
 
 (defmethod pre-parse-event :default
   [e]
@@ -48,7 +54,7 @@
   (map #(map coerce (.getColumns %)) (.getRows e)))
 (defmethod parse-event-data :default
   [e]
-  (println (str e "\n"))
+  (println (str "In file " @log-file ": " e "\n"))
   {})
 
 (defmulti parse-meta-data class)
@@ -79,13 +85,13 @@
 
 (defn replicator
   "get a replicator"
-  [{:keys [username password host port filename position] :as opts} listener]
+  [{:keys [username password host port filename position server-id] :as opts} listener]
   (doto (OpenReplicator.)
     (.setUser username)
     (.setPassword password)
     (.setHost host)
     (.setPort port)
-    (.setServerId 1234)
+    (.setServerId server-id)
     (.setBinlogFileName filename)
     (.setBinlogPosition position)
     (.setBinlogEventListener listener)))
@@ -101,6 +107,8 @@
    ["-p" "--password PASSWORD" "MySQL password"]
    ["-f" "--filename FILENAME" "Binlog filename"]
    ["-n" "--position POSITION" "Binlog position"
+    :parse-fn #(Integer/parseInt %)]
+   ["-i" "--server-id ID" "MySQL master server's ID"
     :parse-fn #(Integer/parseInt %)]
    ["-s" "--stream STREAM" "Kinesis stream name"]])
 
@@ -120,5 +128,7 @@
      (nil? (:position options)) (exit 1 "A replication position must be specified")
      (nil? (:username options)) (exit 1 "A replication username must be specified")
      (nil? (:password options)) (exit 1 "A replication password must be specified")
-     (nil? (:stream options)) (exit 1 "A kinesis stream name must be specified"))
+     (nil? (:stream options)) (exit 1 "A kinesis stream name must be specified")
+     (nil? (:server-id options)) (exit 1 "A server-id name must be specified"))
+    (reset! log-file (:filename options))
     (.start (replicator options (MyListener. (:stream options))))))
