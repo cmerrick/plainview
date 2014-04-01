@@ -18,7 +18,16 @@ Credit goes to the folks at LinkedIn for pioneering this approach - read Jay Kre
  - stronger schema-ing of data
  - process for capturing an initial state of the data
 
-### setup for mysql
+
+### building
+
+Requires Java 7.
+
+You will need to have the [open-replicator](https://github.com/cmerrick/open-replicator) project installed to your local maven repo as it has not yet been published.  Clone that project and install it with `mvn install`.
+
+Build an uberjar with [Leiningen](http://leiningen.org/) using `lein uberjar`.  
+
+### use with mysql
 
 How to use plainview to listen to your MySQL replication stream and write raw change data to Amazon S3.
 
@@ -53,7 +62,7 @@ mysql> show master status;
 
 ##### 2. Setup a Kinesis Stream
 
-(TODO)
+In the Kinesis inteface of your AWS Management console, create a new stream with 1 shard, and take note of the stream name so you can reference it later.
 
 ##### 3. Run the plainview producer
 
@@ -69,7 +78,7 @@ export AWS_SECRET_KEY=<your-secret>
 The key will need full permissions on Kinesis.  From the same shell, run the producer
 
 ```bash
-lein run -m plainview.producer -i <server-id> -f <mysql-file> -n <mysql-position> -P <mysql-port> -u <repl-user> -p <repl-pass> -s <kinesis-stream>
+java -cp plainview-0.1.0-SNAPSHOT-standalone.jar plainview.Producer -i <server-id> -f <mysql-file> -n <mysql-position> -P <mysql-port> -u <repl-user> -p <repl-pass> -s <kinesis-stream>
 ```
 
 Where
@@ -96,7 +105,7 @@ export AWS_SECRET_KEY=<your-secret>
 This key will need read permission on Kinesis, full permission on DynamoDB, and permission to write to an S3 bucket.  From the same shell, run the consumer:
 
 ```bash
-lein run -m plainview.consumer -a <kinesis-app> -b <s3-bucket> -s <kinesis-stream>
+java -cp plainview-0.1.0-SNAPSHOT-standalone.jar plainview.Consumer -a <kinesis-app> -b <s3-bucket> -s <kinesis-stream>
 ```
 
 Where
