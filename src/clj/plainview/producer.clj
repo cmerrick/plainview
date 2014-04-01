@@ -9,8 +9,7 @@
             Int24Column DecimalColumn DoubleColumn
             EnumColumn FloatColumn LongColumn BlobColumn]
            [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
-            TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent RotateEvent])
-  (:gen-class))
+            TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent RotateEvent]))
 
 ;; careful about using atoms if we ever use multiple threads
 (def table-map (atom {}))
@@ -33,7 +32,7 @@
       (java.nio.ByteBuffer/wrap)))
 
 (defn write-kinesis [stream {:keys [data tableid] :as event}]
-  (when (not (empty? data))
+  (when-not (empty? data)
     (kinesis/put-record
      stream
      (string->buff (generate-string event)) tableid))) ;; probably shouldn't use tableid as partition key
@@ -68,7 +67,7 @@
   (map #(map coerce (.getColumns %)) (.getRows e)))
 (defmethod parse-event-data :default
   [e]
-  (println (str "In file " @log-file ": " e "\n"))
+  ;(println (str "In file " @log-file ": " e "\n"))
   {})
 
 (defmulti parse-meta-data class)
@@ -90,12 +89,21 @@
   [e]
   {})
 
-(deftype MyListener [stream]
+(deftype KinesisListener [stream]
   BinlogEventListener
   (onEvents
     [this e]
     (pre-parse-event e)
     (write-kinesis stream (conj {:data (parse-event-data e)} (parse-meta-data e)))))
+
+(deftype StdoutListener []
+  BinlogEventListener
+  (onEvents
+    [this e]
+    (pre-parse-event e)
+    (let [data (parse-event-data e)]
+      (when-not (empty? data)
+        (println (str (generate-string (conj {:data data} (parse-meta-data e))) \newline))))))
 
 (defn replicator
   "get a replicator"
@@ -134,15 +142,20 @@
   (println msg)
   (System/exit status))
 
-(defn -main [& args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
+(defn -main [args]
+  (let [args' (if (= "plainview.Producer" (first args))
+                (next args)
+                args)
+        {:keys [options arguments errors summary]} (parse-opts args' cli-options)]
     (cond
      errors (exit 1 (error-msg errors))
      (nil? (:filename options)) (exit 1 "A replication filename must be specified")
      (nil? (:position options)) (exit 1 "A replication position must be specified")
      (nil? (:username options)) (exit 1 "A replication username must be specified")
      (nil? (:password options)) (exit 1 "A replication password must be specified")
-     (nil? (:stream options)) (exit 1 "A kinesis stream name must be specified")
      (nil? (:server-id options)) (exit 1 "A server-id name must be specified"))
     (reset! log-file (:filename options))
-    (.start (replicator options (MyListener. (:stream options))))))
+    (let [listener (if-not (nil? (:stream options))
+                     (KinesisListener. (:stream options))
+                     (StdoutListener.))]
+      (.start (replicator options listener)))))

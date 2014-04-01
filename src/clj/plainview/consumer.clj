@@ -2,8 +2,7 @@
   (:require [cheshire.core :refer :all]
             [amazonica.aws.kinesis :as kinesis]
             [amazonica.aws.s3 :as s3]
-            [clojure.tools.cli :refer [parse-opts]])
-  (:gen-class))
+            [clojure.tools.cli :refer [parse-opts]]))
 
 (defn- to-json [byte-buffer]
   (let [b (byte-array (.remaining byte-buffer))]
@@ -62,8 +61,11 @@
   (println msg)
   (System/exit status))
 
-(defn -main [& args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
+(defn -main [args]
+  (let [args' (if (= "plainview.Consumer" (first args))
+                (next args)
+                args)
+        {:keys [options arguments errors summary]} (parse-opts args' cli-options)]
     (cond
      errors (exit 1 (error-msg errors))
      (nil? (:app options)) (exit 1 "An application name must be specified")
