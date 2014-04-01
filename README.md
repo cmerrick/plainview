@@ -53,7 +53,7 @@ mysql> show master status;
 
 ##### 2. Setup a Kinesis Stream
 
-(TODO)
+In the Kinesis inteface of your AWS Management console, create a new stream with 1 shard, and take note of the stream name so you can reference it later.
 
 ##### 3. Run the plainview producer
 
