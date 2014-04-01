@@ -18,7 +18,7 @@ Credit goes to the folks at LinkedIn for pioneering this approach - read Jay Kre
  - stronger schema-ing of data
  - process for capturing an initial state of the data
 
-### setup for mysql
+### use with mysql
 
 How to use plainview to listen to your MySQL replication stream and write raw change data to Amazon S3.
 
