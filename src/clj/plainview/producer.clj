@@ -1,161 +1,172 @@
 (ns plainview.producer
   (:require [cheshire.core :refer :all]
             [clojure.string :as string]
-            [clojure.tools.cli :refer [parse-opts]]
-            [amazonica.aws.kinesis :as kinesis])
+            [clojure.tools.cli :refer [parse-opts]])
   (:import [com.google.code.or OpenReplicator]
            [com.google.code.or.binlog BinlogEventListener]
            [com.google.code.or.common.glossary.column
             Int24Column DecimalColumn DoubleColumn
             EnumColumn FloatColumn LongColumn BlobColumn]
            [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
-            TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent RotateEvent]))
+            TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent RotateEvent]
+           com.github.shyiko.mysql.binlog.BinaryLogClient
+           com.github.shyiko.mysql.binlog.BinaryLogClient$EventListener
+           com.github.shyiko.mysql.binlog.BinaryLogClient$LifecycleListener
+           com.github.shyiko.mysql.binlog.event.Event
+           com.github.shyiko.mysql.binlog.event.EventType))
 
-;; careful about using atoms if we ever use multiple threads
-(def table-map (atom {}))
-(def log-file (atom nil))
+(def event-types
+  {EventType/UNKNOWN            :unknown
+   EventType/START_V3           :start-v3
+   EventType/QUERY              :query
+   EventType/STOP               :stop
+   EventType/ROTATE             :rotate
+   EventType/INTVAR             :intvar
+   EventType/LOAD               :load
+   EventType/SLAVE              :slave
+   EventType/CREATE_FILE        :create-file
+   EventType/APPEND_BLOCK       :append-block
+   EventType/EXEC_LOAD          :exec-load
+   EventType/DELETE_FILE        :delete-file
+   EventType/NEW_LOAD           :new-load
+   EventType/RAND               :rand
+   EventType/USER_VAR           :user-var
+   EventType/FORMAT_DESCRIPTION :format-description
+   EventType/XID                :xid
+   EventType/BEGIN_LOAD_QUERY   :begin-load-query
+   EventType/EXECUTE_LOAD_QUERY :execute-load-query
+   EventType/TABLE_MAP          :table-map
+   EventType/PRE_GA_WRITE_ROWS  :pre-ga-write-rows
+   EventType/PRE_GA_UPDATE_ROWS :pre-ga-update-rows
+   EventType/PRE_GA_DELETE_ROWS :pre-ga-delete-rows
+   EventType/WRITE_ROWS         :write-rows
+   EventType/UPDATE_ROWS        :update-rows
+   EventType/DELETE_ROWS        :delete-rows
+   EventType/INCIDENT           :incident
+   EventType/HEARTBEAT          :heartbeat
+   EventType/IGNORABLE          :ignorable
+   EventType/ROWS_QUERY         :rows-query
+   EventType/EXT_WRITE_ROWS     :ext-write-rows
+   EventType/EXT_UPDATE_ROWS    :ext-update-rows
+   EventType/EXT_DELETE_ROWS    :ext-delete-rows
+   EventType/GTID               :gtid
+   EventType/ANONYMOUS_GTID     :anonymous-gtid
+   EventType/PREVIOUS_GTIDS     :previous-gtids})
 
-(defmulti coerce class)
-(defmethod coerce Int24Column [c] (.getValue c))
-(defmethod coerce DecimalColumn [c] (.getValue c))
-(defmethod coerce DoubleColumn [c] (.getValue c))
-(defmethod coerce EnumColumn [c] (.getValue c))
-(defmethod coerce FloatColumn [c] (.getValue c))
-(defmethod coerce LongColumn [c] (.getValue c))
-(defmethod coerce BlobColumn [c] (String. (.getValue c) "UTF-8"))
-(defmethod coerce :default
-  [c]
-  (.toString c))
+(defn bitset-vec
+  [^java.util.BitSet s]
+  (loop [i   0
+         res nil]
+    (let [next (.nextSetBit s i)]
+      (if (neg? next)
+        (vec (reverse res))
+        (recur (inc next) (conj res next))))))
 
-(defn- string->buff [s]
-  (-> (.getBytes s "utf-8")
-      (java.nio.ByteBuffer/wrap)))
+(defmulti augment-event-map :type)
 
-(defn write-kinesis [stream {:keys [data tableid] :as event}]
-  (when-not (empty? data)
-    (kinesis/put-record
-     stream
-     (string->buff (generate-string event)) tableid))) ;; probably shouldn't use tableid as partition key
+(defmethod augment-event-map :format-description
+  [{:keys [data] :as event}]
+  (assoc event
+         :binlog-version (.getBinlogVersion data)
+         :server-version (.getServerVersion data)
+         :header-length  (.getHeaderLength data)))
 
+(defmethod augment-event-map :gtid
+  [{:keys [data] :as event}]
+  (assoc event
+         :gtid  (.getGtid data)
+         :flags (.getFlags data)))
 
-(defn query-table-map [tableid]
-  (get @table-map tableid {:database "_unknown" :table "_unknown"}))
+(defmethod augment-event-map :query
+  [{:keys [data] :as event}]
+  (assoc event
+         :sql        (.getSql data)
+         :error-code (.getErrorCode data)
+         :database   (.getDatabase data)
+         :exec-time  (.getExecutionTime data)))
 
-(defmulti pre-parse-event class)
-(defmethod pre-parse-event TableMapEvent
+(defmethod augment-event-map :rotate
+  [{:keys [data] :as event}]
+  (assoc event
+         :binlog-filename (.getBinlogFilename data)
+         :binlog-position (.getBinlogPosition data)))
+
+(defmethod augment-event-map :rows-query
+  [{:keys [data] :as event}]
+  (assoc event
+         :binlog-filename (.getQuery data)))
+
+(defmethod augment-event-map :table-map
+  [{:keys [data] :as event}]
+  (assoc event
+         :database           (.getDatabase data)
+         :table              (.getTable data)
+         :column-types       (seq (.getColumnTypes data))
+         :column-metadata    (seq (.getColumnMetadata data))
+         :column-nullability (bitset-vec (.getColumnNullability data))))
+
+(defmethod augment-event-map :update-rows
+  [{:keys [data] :as event}]
+  (assoc event
+         :cols-old (bitset-vec (.getIncludedColumnsBeforeUpdate data))
+         :cols-new (bitset-vec (.getIncludedColumns data))
+         :rows     (for [[k v] (.getRows data)] [(mapv str k) (mapv str v)])
+         :table-id (.getTableId data)))
+
+(defmethod augment-event-map :write-rows
+  [{:keys [data] :as event}]
+  (assoc event
+         :cols      (bitset-vec (.getIncludedColumns data))
+         :rows      (mapv (partial mapv str) (.getRows data))
+         :table-id  (.getTableId data)))
+
+(defmethod augment-event-map :delete-rows
+  [{:keys [data] :as event}]
+  (assoc event
+         :cols     (bitset-vec (.getIncludedColumns data))
+         :rows     (mapv (partial mapv str) (.getRows data))
+         :table-id (.getTableId data)))
+
+(defmethod augment-event-map :xid
+  [{:keys [data] :as event}]
+  (assoc event
+         :xid (.getXid data)))
+
+(defmethod augment-event-map :default
+  [event]
+  event)
+
+(defn event->map
   [e]
-  (swap! table-map #(assoc %
-                      (.getTableId e)
-                      {:database (coerce (.getDatabaseName e)) :table (coerce (.getTableName e))})))
-(defmethod pre-parse-event RotateEvent
-  [e]
-  (reset! log-file (coerce (.getBinlogFileName e))))
-(defmethod pre-parse-event :default
-  [e]
-  nil)
+  (let [header (.getHeader e)
+        data   (.getData e)
+        type   (-> (.getEventType header) event-types)]
+    (assoc (augment-event-map {:type type :data data})
+           :timestamp (.getTimestamp header)
+           :server-id (.getServerId header))))
 
+(defn event-listener
+  [callback]
+  (reify
+    BinaryLogClient$EventListener
+    (onEvent [this payload]
+      (callback (dissoc (event->map payload) :data)))))
 
-(defmulti parse-event-data class)
-(defmethod parse-event-data WriteRowsEvent
-  [e]
-  (map #(map coerce (.getColumns %)) (.getRows e)))
-(defmethod parse-event-data UpdateRowsEvent
-  [e]
-  (map #(map coerce (.getColumns (.getAfter %))) (.getRows e)))
-(defmethod parse-event-data DeleteRowsEvent
-  [e]
-  (map #(map coerce (.getColumns %)) (.getRows e)))
-(defmethod parse-event-data :default
-  [e]
-  ;(println (str "In file " @log-file ": " e "\n"))
-  {})
+(defn replication-client
+  [{:keys [host port username password server-id] :as options} callback]
+  (let [client (doto (BinaryLogClient. host port username password)
+                 (.setServerId server-id)
+                 (.registerEventListener (event-listener callback)))]
+    (if (and (:position options) (:filename options))
+      (do
+        (println "Made it")
+        (doto client
+          (.setBinlogFilename (:filename options))
+          (.setBinlogPosition (:position options))))
+      (do
+        (println "Didn't make it")
+        client))))
 
-(defmulti parse-meta-data class)
-(defmethod parse-meta-data AbstractRowEvent
-  [e]
-  (let [tableid (.getTableId e)
-        header {:tableid tableid
-                :timestamp (.getTimestamp (.getHeader e))
-                :tombstone false}]
-    (merge header (query-table-map tableid))))
-(defmethod parse-meta-data DeleteRowsEvent
-  [e]
-  (let [tableid (.getTableId e)
-        header {:tableid tableid
-                :timestamp (.getTimestamp (.getHeader e))
-                :tombstone true}]
-    (merge header (query-table-map tableid))))
-(defmethod parse-meta-data :default
-  [e]
-  {})
-
-(deftype KinesisListener [stream]
-  BinlogEventListener
-  (onEvents
-    [this e]
-    (pre-parse-event e)
-    (write-kinesis stream (conj {:data (parse-event-data e)} (parse-meta-data e)))))
-
-(deftype StdoutListener []
-  BinlogEventListener
-  (onEvents
-    [this e]
-    (pre-parse-event e)
-    (let [data (parse-event-data e)]
-      (when-not (empty? data)
-        (println (str (generate-string (conj {:data data} (parse-meta-data e))) \newline))))))
-
-(defn replicator
-  "get a replicator"
-  [{:keys [username password host port filename position server-id] :as opts} listener]
-  (doto (OpenReplicator.)
-    (.setUser username)
-    (.setPassword password)
-    (.setHost host)
-    (.setPort port)
-    (.setServerId server-id)
-    (.setBinlogFileName filename)
-    (.setBinlogPosition position)
-    (.setBinlogEventListener listener)))
-
-(def cli-options
-  [["-h" "--host HOST" "Replication master hostname or IP"
-    :default "127.0.0.1"]
-   ["-P" "--port PORT" "Replication master port number"
-    :default 3306
-    :parse-fn #(Integer/parseInt %)
-    :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
-   ["-u" "--username USERNAME" "MySQL username"]
-   ["-p" "--password PASSWORD" "MySQL password"]
-   ["-f" "--filename FILENAME" "Binlog filename"]
-   ["-n" "--position POSITION" "Binlog position"
-    :parse-fn #(Integer/parseInt %)]
-   ["-i" "--server-id ID" "MySQL master server's ID"
-    :parse-fn #(Integer/parseInt %)]
-   ["-s" "--stream STREAM" "Kinesis stream name"]])
-
-(defn error-msg [errors]
-  (str "The following errors occurred while parsing your command:\n\n"
-       (string/join \newline errors)))
-
-(defn exit [status msg]
-  (println msg)
-  (System/exit status))
-
-(defn -main [args]
-  (let [args' (if (= "plainview.Producer" (first args))
-                (next args)
-                args)
-        {:keys [options arguments errors summary]} (parse-opts args' cli-options)]
-    (cond
-     errors (exit 1 (error-msg errors))
-     (nil? (:filename options)) (exit 1 "A replication filename must be specified")
-     (nil? (:position options)) (exit 1 "A replication position must be specified")
-     (nil? (:username options)) (exit 1 "A replication username must be specified")
-     (nil? (:password options)) (exit 1 "A replication password must be specified")
-     (nil? (:server-id options)) (exit 1 "A server-id name must be specified"))
-    (reset! log-file (:filename options))
-    (let [listener (if-not (nil? (:stream options))
-                     (KinesisListener. (:stream options))
-                     (StdoutListener.))]
-      (.start (replicator options listener)))))
+(defn connect!
+  [client]
+    (.connect client))

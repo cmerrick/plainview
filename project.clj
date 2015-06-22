@@ -6,16 +6,11 @@
   :repositories [["conjars" {:url "http://conjars.org/repo"}]]
   :source-paths ["src/clj"]
   :test-paths ["test/clj/"]
-  :java-source-paths ["src/java"]
+  :main plainview.core
   :dependencies [[org.clojure/clojure "1.5.0"]
                  [open-replicator/open-replicator "1.0.5"]
-                 [org.apache.hadoop/hadoop-core "1.1.2"]
-                 [cascading/cascading-hadoop "2.5.3"]
-                 [cascading/cascading-local "2.5.3"]
-                 [cascading.gmarabout/cascading-json "0.0.3"]
                  [cheshire "5.3.1"]
                  [org.clojure/tools.cli "0.3.1"]
                  [midje "1.6.3"]
-                 [amazonica "0.2.10"]
-                 [cascalog "2.0.0"]]
+                 [com.github.shyiko/mysql-binlog-connector-java "0.2.1"]]
   :plugins [[lein-midje "3.0.1"]])
