@@ -7,10 +7,11 @@
   :source-paths ["src/clj"]
   :test-paths ["test/clj/"]
   :main plainview.core
-  :dependencies [[org.clojure/clojure "1.5.0"]
-                 [open-replicator/open-replicator "1.0.5"]
+  :dependencies [[org.clojure/clojure "1.6.0"]
                  [cheshire "5.3.1"]
                  [org.clojure/tools.cli "0.3.1"]
                  [midje "1.6.3"]
-                 [com.github.shyiko/mysql-binlog-connector-java "0.2.1"]]
+                 [org.clojure/java.jdbc "0.3.7"]
+                 [com.github.shyiko/mysql-binlog-connector-java "0.2.1"]
+                  [mysql/mysql-connector-java "5.1.35"]]
   :plugins [[lein-midje "3.0.1"]])

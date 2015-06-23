@@ -2,14 +2,7 @@
   (:require [cheshire.core :refer :all]
             [clojure.string :as string]
             [clojure.tools.cli :refer [parse-opts]])
-  (:import [com.google.code.or OpenReplicator]
-           [com.google.code.or.binlog BinlogEventListener]
-           [com.google.code.or.common.glossary.column
-            Int24Column DecimalColumn DoubleColumn
-            EnumColumn FloatColumn LongColumn BlobColumn]
-           [com.google.code.or.binlog.impl.event WriteRowsEvent UpdateRowsEvent
-            TableMapEvent QueryEvent DeleteRowsEvent AbstractRowEvent RotateEvent]
-           com.github.shyiko.mysql.binlog.BinaryLogClient
+  (:import com.github.shyiko.mysql.binlog.BinaryLogClient
            com.github.shyiko.mysql.binlog.BinaryLogClient$EventListener
            com.github.shyiko.mysql.binlog.BinaryLogClient$LifecycleListener
            com.github.shyiko.mysql.binlog.event.Event
@@ -159,12 +152,10 @@
                  (.registerEventListener (event-listener callback)))]
     (if (and (:position options) (:filename options))
       (do
-        (println "Made it")
         (doto client
           (.setBinlogFilename (:filename options))
           (.setBinlogPosition (:position options))))
       (do
-        (println "Didn't make it")
         client))))
 
 (defn connect!

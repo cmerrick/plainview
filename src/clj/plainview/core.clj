@@ -1,6 +1,7 @@
 (ns plainview.core
   (:gen-class)
   (:require [plainview.producer :as producer]
+            [plainview.sql :as sql]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.string :as string]
             [clojure.pprint :as pprint]))
@@ -28,7 +29,16 @@
   (println msg)
   (System/exit status))
 
-(def callback (fn [event] (pprint/pprint event)))
+(defmulti on-event :type)
+(defmethod on-event :query
+  [e]
+  (when (re-matches #"(?i).*ALTER\s+TABLE.*" (:sql e))
+    (println "INVALIDATE CACHE!")))
+(defmethod on-event :default
+  [e]
+  (pprint/pprint e))
+
+(def callback (fn [e] (on-event e)))
 
 (defn -main [& args]
   (let [args' (if (= "plainview.core" (first args))
@@ -40,4 +50,6 @@
      (nil? (:username options)) (exit 1 "A replication username must be specified")
      (nil? (:password options)) (exit 1 "A replication password must be specified")
      (nil? (:server-id options)) (exit 1 "A server-id name must be specified"))
+    (pprint/pprint (sql/databases (sql/spec options)))
+    (pprint/pprint (sql/tables (sql/spec options)))
     (producer/connect! (producer/replication-client options callback))))
