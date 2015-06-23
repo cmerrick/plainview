@@ -50,6 +50,5 @@
      (nil? (:username options)) (exit 1 "A replication username must be specified")
      (nil? (:password options)) (exit 1 "A replication password must be specified")
      (nil? (:server-id options)) (exit 1 "A server-id name must be specified"))
-    (pprint/pprint (sql/databases (sql/spec options)))
-    (pprint/pprint (sql/tables (sql/spec options)))
+    (pprint/pprint (sql/columns (sql/spec options)))
     (producer/connect! (producer/replication-client options callback))))
