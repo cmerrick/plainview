@@ -92,6 +92,7 @@
 (defmethod augment-event-map :table-map
   [{:keys [data] :as event}]
   (assoc event
+         :table-id           (.getTableId data)
          :database           (.getDatabase data)
          :table              (.getTable data)
          :column-types       (seq (.getColumnTypes data))

@@ -6,6 +6,9 @@
             [clojure.string :as string]
             [clojure.pprint :as pprint]))
 
+(def table-map (atom {}))
+(def column-map (atom {}))
+
 (def cli-options
   [["-h" "--host HOST" "Replication master hostname or IP"
     :default "127.0.0.1"]
@@ -34,9 +37,16 @@
   [e]
   (when (re-matches #"(?i).*ALTER\s+TABLE.*" (:sql e))
     (println "INVALIDATE CACHE!")))
+(defmethod on-event :table-map
+  [e]
+  (swap! table-map assoc (:table-id e) (select-keys e [:table :database])))
+(defmethod on-event :write-rows
+  [e]
+  (pprint/pprint {:schema (get @table-map (:table-id e))
+                  :rows (:rows e)}))
 (defmethod on-event :default
   [e]
-  (pprint/pprint e))
+  ())
 
 (def callback (fn [e] (on-event e)))
 
