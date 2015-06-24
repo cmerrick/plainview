@@ -42,8 +42,11 @@
   (swap! table-map assoc (:table-id e) (select-keys e [:table :database])))
 (defmethod on-event :write-rows
   [e]
-  (pprint/pprint {:schema (get @table-map (:table-id e))
-                  :rows (:rows e)}))
+  (let [table (:table (get @table-map (:table-id e)))
+        db (:database (get @table-map (:table-id e)))]
+    (pprint/pprint {:table table
+                    :columns (map :column_name (get @column-map {:table_name table :table_schema db}))
+                    :rows (:rows e)})))
 (defmethod on-event :default
   [e]
   ())
@@ -60,5 +63,5 @@
      (nil? (:username options)) (exit 1 "A replication username must be specified")
      (nil? (:password options)) (exit 1 "A replication password must be specified")
      (nil? (:server-id options)) (exit 1 "A server-id name must be specified"))
-    (pprint/pprint (sql/columns (sql/spec options)))
+    (reset! column-map (sql/columns (sql/spec options)))
     (producer/connect! (producer/replication-client options callback))))
