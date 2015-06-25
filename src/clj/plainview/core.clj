@@ -43,10 +43,11 @@
 (defmethod on-event :write-rows
   [e]
   (let [table (:table (get @table-map (:table-id e)))
-        db (:database (get @table-map (:table-id e)))]
+        db (:database (get @table-map (:table-id e)))
+        field-order (:cols e)
+        fields (map :column_name (get @column-map {:table_name table :table_schema db}))]
     (pprint/pprint {:table table
-                    :columns (map :column_name (get @column-map {:table_name table :table_schema db}))
-                    :rows (:rows e)})))
+                    :data (zipmap fields (map first (sort-by last (map vector (first (:rows e)) field-order))))})))
 (defmethod on-event :default
   [e]
   ())
