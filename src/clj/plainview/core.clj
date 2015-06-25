@@ -4,7 +4,8 @@
             [plainview.sql :as sql]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.string :as string]
-            [clojure.pprint :as pprint]))
+            [clojure.pprint :as pprint]
+            [clojure.set :refer [rename-keys]]))
 
 (def table-map (atom {}))
 (def column-map (atom {}))
@@ -32,6 +33,22 @@
   (println msg)
   (System/exit status))
 
+(defn format-for-rjm
+  [{:keys [timestamp table-id cols rows type deleted?] :as e}]
+  (let [{:keys [table database]} (get @table-map table-id)
+        fields (get @column-map {:table_name table :table_schema database})
+        field-order cols]
+    {:table table
+     :keys (vec (map :column_name
+                     (filter #(= (:column_key %) "PRI") fields)))
+     :data (map #(as->
+                  (->> (map vector % field-order)
+                       (sort-by last)
+                       (map first)) $
+                  (zipmap (map :column_name fields) $)
+                  (assoc $ :timestamp timestamp :deleted? deleted?))
+                rows)}))
+
 (defmulti on-event :type)
 (defmethod on-event :query
   [e]
@@ -42,12 +59,14 @@
   (swap! table-map assoc (:table-id e) (select-keys e [:table :database])))
 (defmethod on-event :write-rows
   [e]
-  (let [table (:table (get @table-map (:table-id e)))
-        db (:database (get @table-map (:table-id e)))
-        field-order (:cols e)
-        fields (map :column_name (get @column-map {:table_name table :table_schema db}))]
-    (pprint/pprint {:table table
-                    :data (zipmap fields (map first (sort-by last (map vector (first (:rows e)) field-order))))})))
+  (format-for-rjm e))
+(defmethod on-event :update-rows
+  [e]
+  (pprint/pprint
+   (format-for-rjm
+    (-> e
+     (rename-keys {:cols-new :cols})
+     (update-in [:rows] (partial map second))))))
 (defmethod on-event :default
   [e]
   ())

@@ -16,5 +16,5 @@
     :result-set-fn (fn [rset]
                      (->>
                       rset
-                      (map #(select-keys % [:table_schema :table_name :column_name]))
+                      (map #(select-keys % [:table_schema :table_name :column_name :column_key]))
                       (group-by #(select-keys % [:table_schema :table_name]))))))
