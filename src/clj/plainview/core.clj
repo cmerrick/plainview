@@ -33,26 +33,30 @@
   (println msg)
   (System/exit status))
 
+
+(defn- order-fields
+  [row-data field-order]
+  (->> (map vector row-data field-order)
+       (sort-by last)
+       (map first)))
+
 (defn format-for-rjm
   [{:keys [timestamp table-id cols rows type deleted?] :as e}]
   (let [{:keys [table database]} (get @table-map table-id)
-        fields (get @column-map {:table_name table :table_schema database})
-        field-order cols]
+        fields (get @column-map {:table_name table :table_schema database})]
     {:table table
      :keys (vec (map :column_name
                      (filter #(= (:column_key %) "PRI") fields)))
      :data (map #(as->
-                  (->> (map vector % field-order)
-                       (sort-by last)
-                       (map first)) $
+                  (order-fields % cols) $
                   (zipmap (map :column_name fields) $)
-                  (assoc $ :timestamp timestamp :deleted? deleted?))
+                  (assoc $ "timestamp" timestamp "deleted?" deleted?))
                 rows)}))
 
 (defmulti on-event :type)
 (defmethod on-event :query
   [e]
-  (when (re-matches #"(?i).*ALTER\s+TABLE.*" (:sql e))
+  (when (re-matches #"(?i)\s*(ALTER|CREATE)\s+TABLE.*" (:sql e))
     (println "INVALIDATE CACHE!")))
 (defmethod on-event :table-map
   [e]
