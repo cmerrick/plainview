@@ -1,12 +1,10 @@
 (ns plainview.producer
-  (:require [cheshire.core :refer :all]
-            [clojure.string :as string]
-            [clojure.tools.cli :refer [parse-opts]])
   (:import com.github.shyiko.mysql.binlog.BinaryLogClient
            com.github.shyiko.mysql.binlog.BinaryLogClient$EventListener
            com.github.shyiko.mysql.binlog.BinaryLogClient$LifecycleListener
            com.github.shyiko.mysql.binlog.event.Event
-           com.github.shyiko.mysql.binlog.event.EventType))
+           com.github.shyiko.mysql.binlog.event.EventType
+           com.github.shyiko.mysql.binlog.event.deserialization.ColumnType))
 
 (def event-types
   {EventType/UNKNOWN            :unknown
@@ -45,6 +43,41 @@
    EventType/GTID               :gtid
    EventType/ANONYMOUS_GTID     :anonymous-gtid
    EventType/PREVIOUS_GTIDS     :previous-gtids})
+
+(def column-types
+  (into {}
+        (for [[k v]
+              {ColumnType/DECIMAL      :decimal
+               ColumnType/TINY         :tiny
+               ColumnType/SHORT        :short
+               ColumnType/LONG         :long
+               ColumnType/FLOAT        :float
+               ColumnType/DOUBLE       :double
+               ColumnType/NULL         :null
+               ColumnType/TIMESTAMP    :timestamp
+               ColumnType/LONGLONG     :longlong
+               ColumnType/INT24        :int
+               ColumnType/DATE         :date
+               ColumnType/TIME         :time
+               ColumnType/DATETIME     :datetime
+               ColumnType/YEAR         :year
+               ColumnType/NEWDATE      :newdate
+               ColumnType/VARCHAR      :varchar
+               ColumnType/BIT          :bit
+               ColumnType/TIMESTAMP_V2 :timestamp-v2
+               ColumnType/DATETIME_V2  :datetime-v2
+               ColumnType/TIME_V2      :time-v2
+               ColumnType/NEWDECIMAL   :newdecimal
+               ColumnType/ENUM         :enum
+               ColumnType/SET          :set
+               ColumnType/TINY_BLOB    :tiny-blob
+               ColumnType/MEDIUM_BLOB  :medium-blob
+               ColumnType/LONG_BLOB    :long-blob
+               ColumnType/BLOB         :blob
+               ColumnType/VAR_STRING   :var-string
+               ColumnType/STRING       :string
+               ColumnType/GEOMETRY     :geometry}]
+          [(.getCode k) v])))
 
 (defn bitset-vec
   [^java.util.BitSet s]
@@ -95,7 +128,8 @@
          :table-id           (.getTableId data)
          :database           (.getDatabase data)
          :table              (.getTable data)
-         :column-types       (seq (.getColumnTypes data))
+         :column-types       (map #(get column-types (bit-and % 0xFF))
+                                  (seq (.getColumnTypes data)))
          :column-metadata    (seq (.getColumnMetadata data))
          :column-nullability (bitset-vec (.getColumnNullability data))))
 
@@ -104,21 +138,21 @@
   (assoc event
          :cols-old (bitset-vec (.getIncludedColumnsBeforeUpdate data))
          :cols-new (bitset-vec (.getIncludedColumns data))
-         :rows     (for [[k v] (.getRows data)] [(mapv str k) (mapv str v)])
+         :rows     (for [[k v] (.getRows data)] [k v])
          :table-id (.getTableId data)))
 
 (defmethod augment-event-map :write-rows
   [{:keys [data] :as event}]
   (assoc event
          :cols      (bitset-vec (.getIncludedColumns data))
-         :rows      (mapv (partial mapv str) (.getRows data))
+         :rows      (.getRows data)
          :table-id  (.getTableId data)))
 
 (defmethod augment-event-map :delete-rows
   [{:keys [data] :as event}]
   (assoc event
          :cols     (bitset-vec (.getIncludedColumns data))
-         :rows     (mapv (partial mapv str) (.getRows data))
+         :rows     (.getRows data)
          :table-id (.getTableId data)))
 
 (defmethod augment-event-map :xid
