@@ -1,7 +1,9 @@
 (ns plainview.producer
+  (:require [clojure.java.jmx :as jmx])
   (:import com.github.shyiko.mysql.binlog.BinaryLogClient
            com.github.shyiko.mysql.binlog.BinaryLogClient$EventListener
            com.github.shyiko.mysql.binlog.BinaryLogClient$LifecycleListener
+           com.github.shyiko.mysql.binlog.jmx.BinaryLogClientStatistics
            com.github.shyiko.mysql.binlog.event.Event
            com.github.shyiko.mysql.binlog.event.EventType
            com.github.shyiko.mysql.binlog.event.deserialization.ColumnType))
@@ -195,4 +197,6 @@
 
 (defn connect!
   [client]
-    (.connect client))
+  (jmx/register-mbean client "mysql.binlog:type=BinaryLogClient")
+  (jmx/register-mbean (BinaryLogClientStatistics. client) "mysql.binlog:type=BinaryLogClientStatistics")
+  (.connect client))

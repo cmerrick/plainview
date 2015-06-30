@@ -18,6 +18,7 @@
                  [rjmetrics "0.1.0"]
                  [clj-http "1.1.2"]
                  [org.clojure/tools.logging "0.3.1"]
+                 [org.clojure/java.jmx "0.3.1"]
                  [log4j/log4j "1.2.17" :exclusions [javax.mail/mail
                                                     javax.jms/jms
                                                     com.sun.jmdk/jmxtools

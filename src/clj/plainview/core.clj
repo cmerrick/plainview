@@ -9,7 +9,8 @@
             [rjmetrics.core :as rjm]
             [clj-http.client :as http]
             [clojure.tools.logging :as log]
-            [clojure.pprint :refer [pprint]]))
+            [clojure.pprint :refer [pprint]]
+            [clojure.java.jmx :as jmx]))
 
 (def table-map (atom {}))
 (def table-filter-fn (atom (constantly false)))
@@ -17,7 +18,7 @@
 (defn event-push-log
   [{:keys [table data]}]
   (when-not (@table-filter-fn table)
-    (log/info table (generate-string data))))
+    (log/info (str "[SecondsBehindMaster" (:SecondsBehindMaster (jmx/mbean "mysql.binlog:type=BinaryLogClientStatistics")) "]") table (generate-string data) )))
 
 (defn event-push-rjm
   [{:keys [table data]}]
@@ -25,14 +26,6 @@
                  table
                  data
                  rjm/SANDBOX-BASE))
-
-(defn error-msg [errors]
-  (str "The following errors occurred while parsing your command:\n\n"
-       (string/join \newline errors)))
-
-(defn exit [status msg]
-  (println msg)
-  (System/exit status))
 
 ;todo
 (defn- apply-col-mask
@@ -98,6 +91,14 @@
 (def callback
   (fn [e]
     (on-event e)))
+
+(defn error-msg [errors]
+  (str "The following errors occurred while parsing your command:\n\n"
+       (string/join \newline errors)))
+
+(defn exit [status msg]
+  (println msg)
+  (System/exit status))
 
 (def cli-options
   [["-h" "--host HOST" "Replication master hostname or IP"
